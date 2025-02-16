@@ -16,7 +16,7 @@ TBD
 | Component | Description | Code |
 | --- | --- | --- |
 | System | System pipeline with the different components | [System](system) |
-| QR Code App | App to scan QRs for the rewards  | [QR Code App](qr-code-app) |
+| QR Code App | App to scan QRs for the rewards  | [QR Code App](qr_app) |
 | Labelling app | App to label manually the different images | [Labelling app](post-experiments/app-labelling) |
 | Analysis Pipeline | Pipeline where we extract features from the experiments | [Analysis Pipeline](post-experiments/data_analysis) |
 
