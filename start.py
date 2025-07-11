@@ -20,38 +20,6 @@ def check_raspberry_pi():
         pass
     return False
 
-def check_dependencies():
-    """Check if required dependencies are installed"""
-    required_packages = [
-        ('rpi_ws281x', 'rpi_ws281x'),
-        ('RPi.GPIO', 'RPi.GPIO'),
-        ('opencv-python', 'cv2'),
-        ('pynput', 'pynput'),
-        ('pymongo', 'pymongo'),
-        ('pillow', 'PIL'),
-        ('numpy', 'numpy')
-    ]
-    
-    missing = []
-    for package_name, import_name in required_packages:
-        try:
-            __import__(import_name)
-        except ImportError:
-            missing.append(package_name)
-    
-    return missing
-
-def install_dependencies():
-    """Install missing dependencies"""
-    print("📦 Installing missing dependencies...")
-    try:
-        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-r', 'requirements.txt'])
-        print("✅ Dependencies installed successfully")
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Failed to install dependencies: {e}")
-        return False
-
 def check_camera():
     """Check if camera is available"""
     try:
@@ -171,20 +139,6 @@ def main():
         if response != 'y':
             return
     
-    # Check dependencies
-    missing_deps = check_dependencies()
-    if missing_deps:
-        print(f"❌ Missing dependencies: {', '.join(missing_deps)}")
-        response = input("Install missing dependencies? (Y/n): ").strip().lower()
-        if response != 'n':
-            if not install_dependencies():
-                print("❌ Failed to install dependencies. Please install manually:")
-                print("   pip install -r requirements.txt")
-                return
-        else:
-            print("❌ Cannot continue without required dependencies")
-            return
-    
     # Check camera
     if not check_camera():
         print("⚠️  Camera not detected or not accessible")
@@ -204,14 +158,6 @@ def main():
                 return
         else:
             print("⚠️  GPIO features may not work without proper permissions")
-    
-    # Run system test
-    print("\n🔍 Running system test...")
-    if not run_system_test():
-        print("⚠️  System test failed. Some features may not work properly")
-        response = input("Continue anyway? (y/N): ").strip().lower()
-        if response != 'y':
-            return
     
     # Start system
     print("\n✅ System ready!")
