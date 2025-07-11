@@ -23,21 +23,21 @@ def check_raspberry_pi():
 def check_dependencies():
     """Check if required dependencies are installed"""
     required_packages = [
-        'rpi_ws281x',
-        'RPi.GPIO',
-        'opencv-python',
-        'pynput',
-        'pymongo',
-        'pillow',
-        'numpy'
+        ('rpi_ws281x', 'rpi_ws281x'),
+        ('RPi.GPIO', 'RPi.GPIO'),
+        ('opencv-python', 'cv2'),
+        ('pynput', 'pynput'),
+        ('pymongo', 'pymongo'),
+        ('pillow', 'PIL'),
+        ('numpy', 'numpy')
     ]
     
     missing = []
-    for package in required_packages:
+    for package_name, import_name in required_packages:
         try:
-            __import__(package.replace('-', '_'))
+            __import__(import_name)
         except ImportError:
-            missing.append(package)
+            missing.append(package_name)
     
     return missing
 
