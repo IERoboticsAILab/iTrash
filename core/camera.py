@@ -26,13 +26,25 @@ class CameraController:
                 print(f"Error: Could not open camera at index {self.camera_index}")
                 return False
             
-            # Set camera properties
+            # Set camera properties for Raspberry Pi
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, HardwareConfig.FRAME_WIDTH)
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, HardwareConfig.FRAME_HEIGHT)
-            self.cap.set(cv2.CAP_PROP_FPS, 30)
+            self.cap.set(cv2.CAP_PROP_FPS, HardwareConfig.CAMERA_FPS)
+            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, HardwareConfig.CAMERA_BUFFER_SIZE)
+            
+            # Additional Raspberry Pi camera optimizations
+            self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
+            
+            # Test camera by reading a frame
+            ret, test_frame = self.cap.read()
+            if not ret:
+                print("Error: Could not read test frame from camera")
+                return False
             
             self.is_initialized = True
             print("Camera initialized successfully")
+            print(f"Camera resolution: {HardwareConfig.FRAME_WIDTH}x{HardwareConfig.FRAME_HEIGHT}")
+            print(f"Camera FPS: {HardwareConfig.CAMERA_FPS}")
             return True
             
         except Exception as e:

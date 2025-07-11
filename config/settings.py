@@ -34,10 +34,13 @@ class HardwareConfig:
     YELLOW_PROXIMITY_PIN = 13
     BROWN_PROXIMITY_PIN = 6
     
-    # Camera Configuration
+    # Camera Configuration - Raspberry Pi optimized
     CAMERA_INDEX = 0
     FRAME_WIDTH = 640
     FRAME_HEIGHT = 480
+    # Raspberry Pi camera specific settings
+    CAMERA_FPS = 30
+    CAMERA_BUFFER_SIZE = 1
 
 # LED Colors
 class Colors:

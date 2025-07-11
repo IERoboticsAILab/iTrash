@@ -1,181 +1,227 @@
 #!/usr/bin/env python3
 """
-Startup script for iTrash unified system.
-Provides different options for running the system.
+iTrash Raspberry Pi Startup Script
+Handles system initialization and provides user guidance.
 """
 
-import sys
 import os
+import sys
+import time
 import subprocess
-import argparse
 from pathlib import Path
+
+def check_raspberry_pi():
+    """Check if running on Raspberry Pi"""
+    try:
+        with open('/proc/cpuinfo', 'r') as f:
+            if 'Raspberry Pi' in f.read():
+                return True
+    except:
+        pass
+    return False
 
 def check_dependencies():
     """Check if required dependencies are installed"""
-    print("Checking dependencies...")
-    
-    # Map package names to their import names
-    package_mapping = {
-        'opencv-python': 'cv2',
-        'pymongo': 'pymongo',
-        'python-dotenv': 'dotenv',
-        'pillow': 'PIL',
-        'requests': 'requests',
-        'streamlit': 'streamlit',
-        'plotly': 'plotly',
-        'pandas': 'pandas',
-        'numpy': 'numpy'
-    }
-    
-    missing_packages = []
-    
-    for package, import_name in package_mapping.items():
-        try:
-            __import__(import_name)
-            print(f"✅ {package}")
-        except ImportError:
-            missing_packages.append(package)
-            print(f"❌ {package}")
-    
-    if missing_packages:
-        print(f"\nMissing packages: {', '.join(missing_packages)}")
-        print("Install them with: pip install -r requirements.txt")
-        return False
-    
-    return True
-
-def check_env_file():
-    """Check if .env file exists"""
-    env_file = Path('.env')
-    if not env_file.exists():
-        print("❌ .env file not found")
-        print("Please create a .env file with the following variables:")
-        print("MONGO_CONNECTION_STRING=your_mongodb_connection_string")
-        print("MONGO_DB_NAME=your_database_name")
-        print("OPENAI_API_KEY=your_openai_api_key")
-        print("YOLO_API_KEY=your_yolo_api_key")
-        return False
-    
-    print("✅ .env file found")
-    return True
-
-def check_images():
-    """Check if display images exist"""
-    images_dir = Path('display/images')
-    if not images_dir.exists():
-        print("❌ Display images directory not found")
-        return False
-    
-    required_images = [
-        'white.png',
-        'processing_new.png',
-        'show_trash.png',
-        'try_again_green.png',
-        'great_job.png',
-        'qr_codes.png',
-        'reward_received_new.png'
+    required_packages = [
+        'rpi_ws281x',
+        'RPi.GPIO',
+        'opencv-python',
+        'pynput',
+        'pymongo',
+        'pillow',
+        'numpy'
     ]
     
-    missing_images = []
-    for image in required_images:
-        if not (images_dir / image).exists():
-            missing_images.append(image)
+    missing = []
+    for package in required_packages:
+        try:
+            __import__(package.replace('-', '_'))
+        except ImportError:
+            missing.append(package)
     
-    if missing_images:
-        print(f"❌ Missing images: {', '.join(missing_images)}")
-        return False
-    
-    print("✅ Display images found")
-    return True
+    return missing
 
-def run_tests():
-    """Run system tests"""
-    print("Running system tests...")
-    result = subprocess.run([sys.executable, 'test_system.py'], capture_output=True, text=True)
-    
-    if result.returncode == 0:
-        print("✅ All tests passed")
+def install_dependencies():
+    """Install missing dependencies"""
+    print("📦 Installing missing dependencies...")
+    try:
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-r', 'requirements.txt'])
+        print("✅ Dependencies installed successfully")
         return True
-    else:
-        print("❌ Some tests failed")
-        print(result.stdout)
-        print(result.stderr)
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Failed to install dependencies: {e}")
         return False
 
-def start_main_system():
-    """Start the main iTrash system"""
-    print("Starting main iTrash system...")
-    subprocess.run([sys.executable, 'main.py'])
+def check_camera():
+    """Check if camera is available"""
+    try:
+        import cv2
+        cap = cv2.VideoCapture(0)
+        if cap.isOpened():
+            ret, frame = cap.read()
+            cap.release()
+            if ret:
+                return True
+    except:
+        pass
+    return False
 
-def start_display_only():
-    """Start only the display interface"""
-    print("Starting display interface only...")
-    subprocess.run([sys.executable, 'display/media_display.py'])
+def check_gpio_permissions():
+    """Check if GPIO permissions are set up"""
+    try:
+        import RPi.GPIO as GPIO
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setwarnings(False)
+        # Test a pin
+        GPIO.setup(18, GPIO.OUT)
+        GPIO.cleanup()
+        return True
+    except:
+        return False
 
-def start_analytics():
-    """Start the analytics dashboard"""
-    print("Starting analytics dashboard...")
-    subprocess.run([sys.executable, '-m', 'streamlit', 'run', 'analytics/dashboard.py'])
+def setup_gpio_permissions():
+    """Setup GPIO permissions"""
+    print("🔧 Setting up GPIO permissions...")
+    try:
+        # Add user to gpio group
+        subprocess.run(['sudo', 'usermod', '-a', '-G', 'gpio', os.getenv('USER')], check=True)
+        print("✅ User added to gpio group")
+        
+        # Create udev rules
+        udev_rules = '''SUBSYSTEM=="bcm2835-gpiomem", GROUP="gpio", MODE="0660"
+SUBSYSTEM=="gpio", GROUP="gpio", MODE="0660"
+SUBSYSTEM=="gpio", KERNEL=="gpiochip*", ACTION=="add", PROGRAM="/bin/sh -c 'chown root:gpio /sys/class/gpio/export /sys/class/gpio/unexport ; chmod 220 /sys/class/gpio/export /sys/class/gpio/unexport'"
+SUBSYSTEM=="gpio", KERNEL=="gpio*", ACTION=="add", PROGRAM="/bin/sh -c 'chown root:gpio /sys/%p/active_low /sys/%p/direction /sys/%p/edge /sys/%p/value ; chmod 660 /sys/%p/active_low /sys/%p/direction /sys/%p/edge /sys/%p/value'"
+'''
+        
+        with open('/tmp/99-gpio.rules', 'w') as f:
+            f.write(udev_rules)
+        
+        subprocess.run(['sudo', 'cp', '/tmp/99-gpio.rules', '/etc/udev/rules.d/'], check=True)
+        subprocess.run(['sudo', 'udevadm', 'control', '--reload-rules'], check=True)
+        subprocess.run(['sudo', 'udevadm', 'trigger'], check=True)
+        
+        print("✅ GPIO udev rules installed")
+        print("⚠️  Please reboot your Raspberry Pi for GPIO permissions to take effect")
+        return True
+        
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Failed to setup GPIO permissions: {e}")
+        return False
 
-def start_camera_test():
-    """Start camera test"""
-    print("Starting camera test...")
-    # This would need to be implemented or use existing test
-    subprocess.run([sys.executable, 'test_system.py'])
+def run_system_test():
+    """Run the system test"""
+    print("🧪 Running system test...")
+    try:
+        result = subprocess.run([sys.executable, 'test_system.py'], capture_output=True, text=True)
+        print(result.stdout)
+        if result.stderr:
+            print("Errors:", result.stderr)
+        return result.returncode == 0
+    except Exception as e:
+        print(f"❌ Failed to run system test: {e}")
+        return False
+
+def start_system():
+    """Start the iTrash system"""
+    print("🚀 Starting iTrash system...")
+    print("Choose an option:")
+    print("1. Run production system (main.py)")
+    print("2. Run development system with manual controls (main_dev.py)")
+    print("3. Run system test")
+    print("4. Exit")
+    
+    while True:
+        try:
+            choice = input("\nEnter your choice (1-4): ").strip()
+            
+            if choice == '1':
+                print("Starting production system...")
+                subprocess.run([sys.executable, 'main.py'])
+                break
+            elif choice == '2':
+                print("Starting development system...")
+                subprocess.run([sys.executable, 'main_dev.py'])
+                break
+            elif choice == '3':
+                run_system_test()
+                break
+            elif choice == '4':
+                print("Goodbye!")
+                break
+            else:
+                print("Invalid choice. Please enter 1-4.")
+                
+        except KeyboardInterrupt:
+            print("\nGoodbye!")
+            break
+        except Exception as e:
+            print(f"Error: {e}")
 
 def main():
     """Main startup function"""
-    parser = argparse.ArgumentParser(description='iTrash System Startup')
-    parser.add_argument('--mode', choices=['main', 'display', 'analytics', 'test', 'check'], 
-                       default='check', help='Mode to run')
-    parser.add_argument('--skip-checks', action='store_true', help='Skip dependency checks')
-    
-    args = parser.parse_args()
-    
-    print("🗑️  iTrash Unified System")
+    print("🎯 iTrash Raspberry Pi Startup")
     print("=" * 40)
     
-    # Change to script directory
-    script_dir = Path(__file__).parent
-    os.chdir(script_dir)
+    # Check if running on Raspberry Pi
+    if not check_raspberry_pi():
+        print("⚠️  Warning: This script is designed for Raspberry Pi")
+        print("   Some features may not work on other systems")
+        response = input("Continue anyway? (y/N): ").strip().lower()
+        if response != 'y':
+            return
     
-    if not args.skip_checks:
-        print("\n🔍 Running pre-flight checks...")
-        
-        checks_passed = True
-        checks_passed &= check_dependencies()
-        checks_passed &= check_env_file()
-        checks_passed &= check_images()
-        
-        if not checks_passed:
-            print("\n❌ Pre-flight checks failed. Please fix the issues above.")
-            return 1
+    # Check dependencies
+    missing_deps = check_dependencies()
+    if missing_deps:
+        print(f"❌ Missing dependencies: {', '.join(missing_deps)}")
+        response = input("Install missing dependencies? (Y/n): ").strip().lower()
+        if response != 'n':
+            if not install_dependencies():
+                print("❌ Failed to install dependencies. Please install manually:")
+                print("   pip install -r requirements.txt")
+                return
+        else:
+            print("❌ Cannot continue without required dependencies")
+            return
     
-    if args.mode == 'check':
-        print("\n✅ All checks passed!")
-        print("\nAvailable modes:")
-        print("  main      - Start the complete iTrash system")
-        print("  display   - Start only the display interface")
-        print("  analytics - Start the analytics dashboard")
-        print("  test      - Run system tests")
-        return 0
+    # Check camera
+    if not check_camera():
+        print("⚠️  Camera not detected or not accessible")
+        print("   Make sure camera is connected and enabled in raspi-config")
+        response = input("Continue without camera? (y/N): ").strip().lower()
+        if response != 'y':
+            return
     
-    elif args.mode == 'test':
-        return 0 if run_tests() else 1
+    # Check GPIO permissions
+    if not check_gpio_permissions():
+        print("⚠️  GPIO permissions not set up")
+        response = input("Setup GPIO permissions? (Y/n): ").strip().lower()
+        if response != 'n':
+            if not setup_gpio_permissions():
+                print("❌ Failed to setup GPIO permissions")
+                print("   You may need to run with sudo or setup permissions manually")
+                return
+        else:
+            print("⚠️  GPIO features may not work without proper permissions")
     
-    elif args.mode == 'main':
-        if not args.skip_checks and not run_tests():
-            print("❌ Tests failed. Use --skip-checks to bypass.")
-            return 1
-        start_main_system()
+    # Run system test
+    print("\n🔍 Running system test...")
+    if not run_system_test():
+        print("⚠️  System test failed. Some features may not work properly")
+        response = input("Continue anyway? (y/N): ").strip().lower()
+        if response != 'y':
+            return
     
-    elif args.mode == 'display':
-        start_display_only()
-    
-    elif args.mode == 'analytics':
-        start_analytics()
-    
-    return 0
+    # Start system
+    print("\n✅ System ready!")
+    start_system()
 
-if __name__ == '__main__':
-    sys.exit(main()) 
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n👋 Goodbye!")
+    except Exception as e:
+        print(f"💥 Startup failed: {e}")
+        print("Please check the error and try again") 

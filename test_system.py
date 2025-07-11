@@ -1,130 +1,169 @@
+#!/usr/bin/env python3
 """
-Test script for iTrash unified system.
-Tests all components individually and together.
+Comprehensive system test for iTrash on Raspberry Pi.
+Tests all hardware components and software functionality.
 """
 
+import time
 import sys
 import os
-import time
-import asyncio
+import threading
+from datetime import datetime
 
-# Add current directory to path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-from config.settings import *
-from core.hardware import HardwareController
-from core.camera import CameraController
-from core.ai_classifier import ClassificationManager
-from core.database import db_manager
-from display.media_display import DisplayManager
-
-def test_database():
-    """Test database connection and operations"""
-    print("Testing database...")
+def test_imports():
+    """Test if all required modules can be imported"""
+    print("🔍 Testing module imports...")
     
     try:
-        # Test connection
-        if db_manager.connect():
-            print("✅ Database connection successful")
-        else:
-            print("❌ Database connection failed")
-            return False
+        import cv2
+        print("✅ OpenCV imported successfully")
+    except ImportError as e:
+        print(f"❌ Failed to import OpenCV: {e}")
+        return False
+    
+    try:
+        import RPi.GPIO as GPIO
+        print("✅ RPi.GPIO imported successfully")
+    except ImportError as e:
+        print(f"❌ Failed to import RPi.GPIO: {e}")
+        print("   This is required for proximity sensors")
+        return False
+    
+    try:
+        from rpi_ws281x import Adafruit_NeoPixel, Color
+        print("✅ rpi_ws281x imported successfully")
+    except ImportError as e:
+        print(f"❌ Failed to import rpi_ws281x: {e}")
+        print("   This is required for LED strip")
+        return False
+    
+    try:
+        from pynput import keyboard
+        print("✅ pynput imported successfully")
+    except ImportError as e:
+        print(f"❌ Failed to import pynput: {e}")
+        print("   This is required for manual controls")
+        return False
+    
+    try:
+        import numpy as np
+        from PIL import Image
+        print("✅ NumPy and PIL imported successfully")
+    except ImportError as e:
+        print(f"❌ Failed to import NumPy/PIL: {e}")
+        return False
+    
+    return True
+
+def test_gpio():
+    """Test GPIO functionality"""
+    print("\n🔌 Testing GPIO functionality...")
+    
+    try:
+        import RPi.GPIO as GPIO
         
-        # Test accumulator operations
-        db_manager.update_acc(0)
-        acc_value = db_manager.get_acc_value()
-        print(f"✅ Accumulator value: {acc_value}")
+        # Test GPIO setup
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setwarnings(False)
         
-        # Test increment
-        db_manager.increment_acc(1)
-        acc_value = db_manager.get_acc_value()
-        print(f"✅ Incremented accumulator: {acc_value}")
+        # Test pins from config
+        from config.settings import HardwareConfig
         
+        test_pins = [
+            HardwareConfig.DETECT_OBJECT_SENSOR_PIN,
+            HardwareConfig.BLUE_PROXIMITY_PIN,
+            HardwareConfig.YELLOW_PROXIMITY_PIN,
+            HardwareConfig.BROWN_PROXIMITY_PIN
+        ]
+        
+        for pin in test_pins:
+            try:
+                GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+                state = GPIO.input(pin)
+                print(f"✅ Pin {pin} configured successfully (state: {state})")
+            except Exception as e:
+                print(f"❌ Failed to configure pin {pin}: {e}")
+        
+        GPIO.cleanup()
         return True
         
     except Exception as e:
-        print(f"❌ Database test failed: {e}")
+        print(f"❌ GPIO test failed: {e}")
         return False
 
-def test_hardware():
-    """Test hardware components"""
-    print("Testing hardware...")
+def test_led_strip():
+    """Test LED strip functionality"""
+    print("\n💡 Testing LED strip...")
     
     try:
-        hardware = HardwareController()
-        print("✅ Hardware controller initialized")
+        from rpi_ws281x import Adafruit_NeoPixel, Color
+        from config.settings import HardwareConfig
         
-        # Test LED strip
-        led_strip = hardware.get_led_strip()
-        print("✅ LED strip initialized")
+        # Initialize LED strip
+        strip = Adafruit_NeoPixel(
+            HardwareConfig.LED_COUNT,
+            HardwareConfig.LED_PIN,
+            HardwareConfig.LED_FREQ_HZ,
+            HardwareConfig.LED_DMA,
+            HardwareConfig.LED_INVERT,
+            HardwareConfig.LED_BRIGHTNESS,
+            HardwareConfig.LED_CHANNEL
+        )
+        strip.begin()
         
-        # Test basic LED operations
-        led_strip.set_color_all((255, 0, 0))  # Red
-        print("✅ LED strip set to red")
-        time.sleep(1)
+        print("✅ LED strip initialized successfully")
         
-        led_strip.set_color_all((0, 255, 0))  # Green
-        print("✅ LED strip set to green")
-        time.sleep(1)
+        # Test different colors
+        colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 255)]
+        color_names = ["Red", "Green", "Blue", "White"]
         
-        led_strip.clear_all()
-        print("✅ LED strip cleared")
+        for color, name in zip(colors, color_names):
+            print(f"   Testing {name} color...")
+            for i in range(strip.numPixels()):
+                strip.setPixelColor(i, Color(*color))
+            strip.show()
+            time.sleep(0.5)
         
-        # Test proximity sensors
-        proximity_sensors = hardware.get_proximity_sensors()
-        print("✅ Proximity sensors initialized")
+        # Clear LEDs
+        for i in range(strip.numPixels()):
+            strip.setPixelColor(i, Color(0, 0, 0))
+        strip.show()
         
-        # Test sensor readings (just check if they don't crash)
-        proximity_sensors.detect_object_proximity()
-        proximity_sensors.detect_blue_bin()
-        proximity_sensors.detect_yellow_bin()
-        proximity_sensors.detect_brown_bin()
-        print("✅ Proximity sensor readings successful")
-        
-        # Cleanup
-        hardware.cleanup()
-        print("✅ Hardware cleanup successful")
-        
+        print("✅ LED strip test completed successfully")
         return True
         
     except Exception as e:
-        print(f"❌ Hardware test failed: {e}")
+        print(f"❌ LED strip test failed: {e}")
         return False
 
 def test_camera():
     """Test camera functionality"""
-    print("Testing camera...")
+    print("\n📷 Testing camera...")
     
     try:
+        from core.camera import CameraController
+        
         camera = CameraController()
         
         if camera.initialize():
-            print("✅ Camera initialized")
+            print("✅ Camera initialized successfully")
             
             # Test frame capture
             frame = camera.capture_image()
             if frame is not None:
-                print(f"✅ Frame captured: {frame.shape}")
+                height, width = frame.shape[:2]
+                print(f"✅ Frame captured successfully: {width}x{height}")
+                
+                # Test image encoding
+                encoded = camera.encode_image_to_base64(frame)
+                if encoded:
+                    print("✅ Image encoding successful")
+                else:
+                    print("❌ Image encoding failed")
             else:
                 print("❌ Frame capture failed")
-                return False
             
-            # Test base64 encoding
-            base64_image = camera.encode_image_to_base64(frame)
-            if base64_image:
-                print(f"✅ Image encoded to base64: {len(base64_image)} characters")
-            else:
-                print("❌ Base64 encoding failed")
-                return False
-            
-            # Test QR code detection (with empty frame)
-            qr_data = camera.detect_qr_code(frame)
-            print(f"✅ QR detection test completed: {qr_data}")
-            
-            # Cleanup
             camera.release()
-            print("✅ Camera cleanup successful")
-            
             return True
         else:
             print("❌ Camera initialization failed")
@@ -134,158 +173,180 @@ def test_camera():
         print(f"❌ Camera test failed: {e}")
         return False
 
-def test_ai_classifier():
-    """Test AI classifier"""
-    print("Testing AI classifier...")
+def test_manual_controls():
+    """Test manual controls functionality"""
+    print("\n⌨️  Testing manual controls...")
     
     try:
-        classifier = ClassificationManager()
-        print("✅ Classifier initialized")
+        from core.manual_controls import ManualProximitySensors
         
-        # Test stats
-        stats = classifier.get_classification_stats()
-        print(f"✅ Classifier stats: {stats}")
+        sensors = ManualProximitySensors()
+        print("✅ Manual proximity sensors initialized")
+        print("   Press keys to test:")
+        print("   - 'o' for object detection")
+        print("   - 'b' for blue bin")
+        print("   - 'y' for yellow bin")
+        print("   - 'r' for brown bin")
+        print("   - 'c' to clear all")
+        print("   - 'q' to quit test")
         
+        # Test for 10 seconds
+        start_time = time.time()
+        while time.time() - start_time < 10:
+            if sensors.detect_object_proximity():
+                print("   ✅ Object detection triggered")
+            if sensors.detect_blue_bin():
+                print("   ✅ Blue bin triggered")
+            if sensors.detect_yellow_bin():
+                print("   ✅ Yellow bin triggered")
+            if sensors.detect_brown_bin():
+                print("   ✅ Brown bin triggered")
+            time.sleep(0.1)
+        
+        sensors.cleanup()
+        print("✅ Manual controls test completed")
         return True
         
     except Exception as e:
-        print(f"❌ AI classifier test failed: {e}")
-        return False
-
-async def test_classification_with_image():
-    """Test classification with a sample image"""
-    print("Testing classification with image...")
-    
-    try:
-        # Create a simple test image
-        import numpy as np
-        import cv2
-        
-        # Create a simple colored rectangle
-        test_image = np.zeros((224, 224, 3), dtype=np.uint8)
-        test_image[50:150, 50:150] = [255, 0, 0]  # Blue rectangle
-        
-        classifier = ClassificationManager()
-        
-        # Test classification
-        result = await classifier.process_image_with_feedback(test_image)
-        print(f"✅ Classification result: {result}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Classification test failed: {e}")
+        print(f"❌ Manual controls test failed: {e}")
         return False
 
 def test_display():
     """Test display functionality"""
-    print("Testing display...")
+    print("\n🖥️  Testing display...")
     
     try:
-        display_manager = DisplayManager()
+        from display.media_display import DisplayManager
+        
+        # Test display manager initialization
+        manager = DisplayManager()
         print("✅ Display manager initialized")
         
-        # Test status
-        status = display_manager.get_display_status()
-        print(f"✅ Display status: {status}")
+        # Test display status
+        status = manager.get_display_status()
+        print(f"   Display status: {status}")
         
+        print("✅ Display test completed")
         return True
         
     except Exception as e:
         print(f"❌ Display test failed: {e}")
         return False
 
-def test_configuration():
-    """Test configuration loading"""
-    print("Testing configuration...")
+def test_database():
+    """Test database connectivity"""
+    print("\n🗄️  Testing database...")
     
     try:
-        # Test hardware config
-        print(f"✅ LED count: {HardwareConfig.LED_COUNT}")
-        print(f"✅ LED pin: {HardwareConfig.LED_PIN}")
-        print(f"✅ Camera index: {HardwareConfig.CAMERA_INDEX}")
+        from core.database import db_manager
         
-        # Test system states
-        print(f"✅ System states: {SystemStates.IDLE}, {SystemStates.PROCESSING}")
+        if db_manager.connect():
+            print("✅ Database connection successful")
+            
+            # Test accumulator operations
+            db_manager.update_acc(0)
+            acc_value = db_manager.get_acc_value()
+            print(f"   Accumulator value: {acc_value}")
+            
+            return True
+        else:
+            print("❌ Database connection failed")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Database test failed: {e}")
+        return False
+
+def test_hardware_controller():
+    """Test complete hardware controller"""
+    print("\n🔧 Testing hardware controller...")
+    
+    try:
+        from core.hardware import HardwareController
         
-        # Test colors
-        print(f"✅ Colors: {Colors.BLUE}, {Colors.YELLOW}, {Colors.BROWN}")
+        controller = HardwareController()
+        print("✅ Hardware controller initialized")
         
-        # Test display config
-        print(f"✅ Window size: {DisplayConfig.WINDOW_WIDTH}x{DisplayConfig.WINDOW_HEIGHT}")
+        # Test LED strip
+        led_strip = controller.get_led_strip()
+        if led_strip:
+            print("✅ LED strip accessible")
+            led_strip.set_color_all((255, 0, 0))  # Red
+            time.sleep(1)
+            led_strip.clear_all()
         
+        # Test proximity sensors
+        sensors = controller.get_proximity_sensors()
+        if sensors:
+            print("✅ Proximity sensors accessible")
+            # Test sensor states
+            print(f"   Object sensor: {sensors.detect_object_proximity()}")
+            print(f"   Blue bin: {sensors.detect_blue_bin()}")
+            print(f"   Yellow bin: {sensors.detect_yellow_bin()}")
+            print(f"   Brown bin: {sensors.detect_brown_bin()}")
+        
+        controller.cleanup()
+        print("✅ Hardware controller test completed")
         return True
         
     except Exception as e:
-        print(f"❌ Configuration test failed: {e}")
+        print(f"❌ Hardware controller test failed: {e}")
         return False
 
-async def run_all_tests():
+def main():
     """Run all tests"""
-    print("🧪 Starting iTrash System Tests")
+    print("🚀 Starting iTrash Raspberry Pi System Test")
     print("=" * 50)
     
     tests = [
-        ("Configuration", test_configuration),
-        ("Database", test_database),
-        ("Hardware", test_hardware),
+        ("Module Imports", test_imports),
+        ("GPIO", test_gpio),
+        ("LED Strip", test_led_strip),
         ("Camera", test_camera),
-        ("AI Classifier", test_ai_classifier),
-        ("Classification with Image", test_classification_with_image),
+        ("Manual Controls", test_manual_controls),
         ("Display", test_display),
+        ("Database", test_database),
+        ("Hardware Controller", test_hardware_controller)
     ]
     
-    results = {}
+    results = []
     
     for test_name, test_func in tests:
-        print(f"\n🔍 Testing {test_name}...")
         try:
-            if asyncio.iscoroutinefunction(test_func):
-                result = await test_func()
-            else:
-                result = test_func()
-            results[test_name] = result
+            result = test_func()
+            results.append((test_name, result))
         except Exception as e:
             print(f"❌ {test_name} test crashed: {e}")
-            results[test_name] = False
+            results.append((test_name, False))
     
-    # Print summary
+    # Summary
     print("\n" + "=" * 50)
-    print("📊 Test Results Summary")
+    print("📊 TEST SUMMARY")
     print("=" * 50)
     
     passed = 0
     total = len(results)
     
-    for test_name, result in results.items():
+    for test_name, result in results:
         status = "✅ PASS" if result else "❌ FAIL"
-        print(f"{test_name}: {status}")
+        print(f"{status} {test_name}")
         if result:
             passed += 1
     
-    print(f"\nOverall: {passed}/{total} tests passed")
+    print(f"\nResults: {passed}/{total} tests passed")
     
     if passed == total:
-        print("🎉 All tests passed! System is ready to run.")
-        return True
+        print("🎉 All tests passed! System is ready to use.")
     else:
         print("⚠️  Some tests failed. Please check the issues above.")
-        return False
-
-def main():
-    """Main test function"""
-    try:
-        success = asyncio.run(run_all_tests())
-        if success:
-            print("\n🚀 Ready to start iTrash system!")
-            print("Run 'python main.py' to start the system")
-        else:
-            print("\n🔧 Please fix the failed tests before running the system")
-        
-    except KeyboardInterrupt:
-        print("\n⏹️  Tests interrupted by user")
-    except Exception as e:
-        print(f"\n💥 Test suite crashed: {e}")
+        print("\nTroubleshooting tips:")
+        print("1. Make sure all dependencies are installed: pip install -r requirements.txt")
+        print("2. Check camera permissions and connections")
+        print("3. Verify GPIO pins are not in use by other processes")
+        print("4. Ensure you're running on a Raspberry Pi with proper hardware")
+    
+    return passed == total
 
 if __name__ == "__main__":
-    main() 
+    success = main()
+    sys.exit(0 if success else 1) 

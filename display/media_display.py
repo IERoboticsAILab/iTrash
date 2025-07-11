@@ -65,7 +65,10 @@ class MediaDisplay:
         self.root.title("iTrash Media Display")
         
         if DisplayConfig.FULLSCREEN:
+            # Raspberry Pi specific fullscreen handling
             self.root.attributes('-fullscreen', True)
+            # Hide cursor in fullscreen mode
+            self.root.config(cursor="none")
         
         self.frame = Frame(self.root)
         self.frame.pack(fill='both', expand=True)
@@ -78,6 +81,9 @@ class MediaDisplay:
         
         # Bind other keys for debugging
         self.root.bind("<Key>", self._handle_key_press)
+        
+        # Bind mouse click to quit (useful for touchscreens)
+        self.root.bind("<Button-1>", lambda event: self.quit())
     
     def _handle_key_press(self, event):
         """Handle key press events"""
@@ -87,6 +93,14 @@ class MediaDisplay:
             self.refresh_display()
         elif event.char == 'b':
             self.toggle_browser()
+        elif event.char == 'f':
+            self.toggle_fullscreen()
+    
+    def toggle_fullscreen(self):
+        """Toggle fullscreen mode"""
+        if self.root:
+            current_state = self.root.attributes('-fullscreen')
+            self.root.attributes('-fullscreen', not current_state)
     
     def show_media(self):
         """Show media based on current accumulator value"""
@@ -95,50 +109,38 @@ class MediaDisplay:
             return
         
         if self.acc == SystemStates.IDLE:
-            self.switch_to_chromium()
+            # For Raspberry Pi, we'll show a simple idle screen instead of browser
+            self.show_idle_screen()
         elif self.acc == SystemStates.REWARD:
             # Show reward image for 5 seconds then reset
             self.restore_and_show_image()
             time.sleep(DisplayConfig.IMAGE_DISPLAY_DELAY)
             db_manager.update_acc(SystemStates.IDLE)
         else:
-            if self.browser_opened:
-                self.minimize_chromium()
             if self.acc != self.last_acc:
                 self.restore_and_show_image()
                 self.last_acc = self.acc
     
+    def show_idle_screen(self):
+        """Show idle screen for Raspberry Pi"""
+        # Show a simple white screen or logo instead of browser
+        image_file = self._get_image_by_acc(SystemStates.IDLE)
+        if image_file:
+            self.show_image(image_file)
+    
     def switch_to_chromium(self):
-        """Switch to Chromium browser window"""
-        try:
-            # Use xdotool to find and focus on the Chromium window
-            window_id = subprocess.check_output(
-                ["xdotool", "search", "--onlyvisible", "--class", "chromium"]
-            ).strip().decode()
-            subprocess.call(["xdotool", "windowactivate", window_id])
-            self.browser_opened = True
-            time.sleep(0.5)  # Allow some time for the switch to complete
-        except subprocess.CalledProcessError:
-            print("Chromium window not found.")
+        """Switch to Chromium browser window - disabled for Raspberry Pi"""
+        print("Browser switching disabled on Raspberry Pi")
+        # This function is kept for compatibility but doesn't work on RPi
     
     def minimize_chromium(self):
-        """Minimize Chromium browser window"""
-        try:
-            # Use xdotool to find and minimize the Chromium window
-            window_id = subprocess.check_output(
-                ["xdotool", "search", "--onlyvisible", "--class", "chromium"]
-            ).strip().decode()
-            subprocess.call(["xdotool", "windowminimize", window_id])
-            self.browser_opened = False
-        except subprocess.CalledProcessError:
-            print("Failed to minimize Chromium window.")
+        """Minimize Chromium browser window - disabled for Raspberry Pi"""
+        print("Browser switching disabled on Raspberry Pi")
+        # This function is kept for compatibility but doesn't work on RPi
     
     def toggle_browser(self):
-        """Toggle browser visibility"""
-        if self.browser_opened:
-            self.minimize_chromium()
-        else:
-            self.switch_to_chromium()
+        """Toggle browser visibility - disabled for Raspberry Pi"""
+        print("Browser switching disabled on Raspberry Pi")
     
     def restore_and_show_image(self):
         """Restore the Tkinter window and show image"""
@@ -252,12 +254,15 @@ class DisplayManager:
         self.display = None
     
     def start_display(self, images_dir="display/images"):
-        """Start the media display"""
-        self.display = MediaDisplay(images_dir)
-        self.display.start()
+        """Start the display system"""
+        try:
+            self.display = MediaDisplay(images_dir)
+            self.display.start()
+        except Exception as e:
+            print(f"Error starting display: {e}")
     
     def stop_display(self):
-        """Stop the media display"""
+        """Stop the display system"""
         if self.display:
             self.display.quit()
     
@@ -265,20 +270,19 @@ class DisplayManager:
         """Get display status"""
         if self.display:
             return self.display.get_status()
-        return {"status": "not_started"}
+        return {"error": "Display not initialized"}
 
 
-# Utility functions for testing
 def test_display():
-    """Test the display functionality"""
+    """Test the display system"""
     manager = DisplayManager()
     try:
         manager.start_display()
     except KeyboardInterrupt:
-        print("Display stopped by user")
+        print("Display test interrupted")
     finally:
         manager.stop_display()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_display() 
