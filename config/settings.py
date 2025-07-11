@@ -48,6 +48,7 @@ class Colors:
     ORANGE = (102, 51, 0)
     YELLOW = (255, 255, 0)
     WHITE = (255, 255, 255)
+    BROWN = (139, 69, 19)
 
 # System States (ACC Values)
 class SystemStates:

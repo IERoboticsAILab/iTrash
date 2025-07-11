@@ -54,7 +54,8 @@ class DatabaseManager:
         
         try:
             cursor = self.collection.find({})
-            if cursor.count() > 0:
+            # Use count_documents instead of cursor.count() for newer PyMongo versions
+            if self.collection.count_documents({}) > 0:
                 return cursor[0].get("acc", 0)
             else:
                 # Initialize if no document exists
