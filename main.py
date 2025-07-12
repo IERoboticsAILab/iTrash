@@ -1,6 +1,6 @@
 """
 Main application for iTrash unified system.
-Orchestrates hardware control, AI classification, display, and analytics.
+Wrapper around FastAPI + state machine for hybrid operation.
 """
 
 import asyncio
@@ -8,13 +8,14 @@ import time
 import threading
 import signal
 import sys
+import argparse
 from datetime import datetime
 from config.settings import SystemStates, TimingConfig
 from core.hardware import HardwareController
 from core.camera import CameraController
 from core.ai_classifier import ClassificationManager
-from core.database import db_manager
 from display.media_display import DisplayManager
+from api.state import state
 
 class iTrashSystem:
     """Main iTrash system controller"""
@@ -33,10 +34,6 @@ class iTrashSystem:
     def _initialize_components(self):
         """Initialize all system components"""
         print("Initializing iTrash system...")
-        
-        # Initialize database
-        if not db_manager.connect():
-            print("Warning: Failed to connect to database")
         
         # Initialize hardware
         try:
@@ -75,8 +72,8 @@ class iTrashSystem:
             print(f"Error initializing display manager: {e}")
             self.display_manager = None
         
-        # Initialize accumulator
-        db_manager.update_acc(SystemStates.IDLE)
+        # Initialize state
+        state.update("system_status", "ready")
         print("System initialization complete")
     
     def start_display(self):
@@ -101,7 +98,7 @@ class iTrashSystem:
         proximity_sensors = self.hardware.get_proximity_sensors()
         
         # Set state to user confirmation
-        db_manager.update_acc(SystemStates.USER_CONFIRMATION)
+        state.update("phase", "user_confirmation")
         
         # Show appropriate LED color based on classification
         if trash_class == "blue":
@@ -134,13 +131,13 @@ class iTrashSystem:
             return
         
         # Set state to processing
-        db_manager.update_acc(SystemStates.PROCESSING)
+        state.update("phase", "processing")
         
         # Capture image
         frame = self.camera.capture_image()
         if frame is None:
             print("Failed to capture image")
-            db_manager.update_acc(SystemStates.IDLE)
+            state.update("phase", "idle")
             return
         
         # Classify trash
@@ -151,41 +148,32 @@ class iTrashSystem:
             # Show error animation
             if self.hardware:
                 self.hardware.show_error_animation()
-            db_manager.update_acc(SystemStates.IDLE)
+            state.update("phase", "error")
             return
         
         # Set state to show trash
-        db_manager.update_acc(SystemStates.SHOW_TRASH)
+        state.update("phase", "show_trash")
+        state.update("last_classification", trash_class)
         
         # Wait for user confirmation
         confirmed = await self.wait_for_user_confirmation(trash_class)
         
         if confirmed:
             # Success - show reward
-            db_manager.update_acc(SystemStates.REWARD)
+            state.update("phase", "reward")
+            state.update("reward", True)
             if self.hardware:
                 self.hardware.show_success_animation()
-            
-            # Store image data
-            current_time = datetime.now()
-            today = current_time.strftime("%Y-%m-%d")
-            hour_day = current_time.strftime("%H:%M:%S")
-            
-            # Encode image
-            image_base64 = self.camera.encode_image_to_base64(frame)
-            if image_base64:
-                db_manager.insert_image_data(
-                    image_base64, today, hour_day, trash_class, "", True
-                )
         else:
             # Timeout or incorrect bin
-            db_manager.update_acc(SystemStates.TIMEOUT)
+            state.update("phase", "timeout")
             if self.hardware:
                 self.hardware.show_error_animation()
         
         # Reset to idle after delay
         await asyncio.sleep(2)
-        db_manager.update_acc(SystemStates.IDLE)
+        state.update("phase", "idle")
+        state.update("reward", False)
         
         # Clear LEDs
         if self.hardware:
@@ -206,7 +194,7 @@ class iTrashSystem:
         await asyncio.sleep(TimingConfig.OBJECT_DETECTION_DELAY)
         
         # Set initial state
-        db_manager.update_acc(SystemStates.IDLE)
+        state.update("phase", "idle")
         
         while self.is_running:
             try:
@@ -215,7 +203,8 @@ class iTrashSystem:
                     print("Object detected!")
                     
                     # Set state to processing
-                    db_manager.update_acc(SystemStates.PROCESSING)
+                    state.update("phase", "processing")
+                    state.update_sensor_status("object_detected", True)
                     
                     # Show white LEDs
                     led_strip = self.hardware.get_led_strip()
@@ -266,9 +255,6 @@ class iTrashSystem:
         if self.camera:
             self.camera.release()
         
-        # Disconnect database
-        db_manager.disconnect()
-        
         print("System stopped")
 
 
@@ -280,18 +266,34 @@ def signal_handler(signum, frame):
 
 def main():
     """Main entry point"""
-    # Set up signal handlers
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    parser = argparse.ArgumentParser(description="iTrash System")
+    parser.add_argument("--mode", choices=["traditional", "api"], default="traditional",
+                       help="Run mode: traditional (hardware loop) or api (FastAPI server)")
+    parser.add_argument("--port", type=int, default=8000, help="API server port")
     
-    # Create and start system
-    system = iTrashSystem()
+    args = parser.parse_args()
     
-    try:
-        system.start()
-    except Exception as e:
-        print(f"Error starting system: {e}")
-        system.stop()
+    if args.mode == "api":
+        # Run API server
+        import uvicorn
+        from run_server import create_app
+        
+        app = create_app()
+        uvicorn.run(app, host="0.0.0.0", port=args.port)
+    else:
+        # Run traditional mode
+        # Set up signal handlers
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+        
+        # Create and start system
+        system = iTrashSystem()
+        
+        try:
+            system.start()
+        except Exception as e:
+            print(f"Error starting system: {e}")
+            system.stop()
 
 
 if __name__ == "__main__":

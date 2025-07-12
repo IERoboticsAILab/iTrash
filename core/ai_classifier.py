@@ -144,45 +144,11 @@ class GPTClassifier:
         print("GPT classification failed after all retries")
         return ""
 
-
-class HybridClassifier:
-    """Hybrid classifier that combines YOLO and GPT"""
-    
-    def __init__(self):
-        self.yolo_classifier = YOLOClassifier()
-        self.gpt_classifier = GPTClassifier()
-    
-    def classify(self, image, use_gpt_fallback=True):
-        """Classify trash using hybrid approach"""
-        # Try YOLO first
-        yolo_result = self.yolo_classifier.classify(image)
-        
-        if yolo_result and yolo_result in TrashClassification.VALID_COLORS:
-            print(f"Using YOLO result: {yolo_result}")
-            return yolo_result
-        
-        # Fallback to GPT if YOLO fails or returns invalid result
-        if use_gpt_fallback:
-            gpt_result = self.gpt_classifier.classify(image)
-            if gpt_result and gpt_result in TrashClassification.VALID_COLORS:
-                print(f"Using GPT fallback result: {gpt_result}")
-                return gpt_result
-        
-        print("Both YOLO and GPT failed to classify")
-        return ""
-    
-    async def classify_async(self, image, use_gpt_fallback=True):
-        """Async version of classification"""
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, self.classify, image, use_gpt_fallback)
-        return result
-
-
 class ClassificationManager:
     """Manages the classification process with LED feedback"""
     
     def __init__(self, led_strip=None):
-        self.classifier = HybridClassifier()
+        self.classifier = GPTClassifier()
         self.led_strip = led_strip
     
     def set_led_strip(self, led_strip):
@@ -196,7 +162,7 @@ class ClassificationManager:
             self.led_strip.set_color_all((255, 255, 255))  # White for processing
         
         # Perform classification
-        result = await self.classifier.classify_async(image)
+        result = await self.classifier.classify(image)
         
         if self.led_strip:
             if result:
@@ -217,8 +183,8 @@ class ClassificationManager:
         """Get classification statistics"""
         # This could be expanded to track accuracy, response times, etc.
         return {
-            "classifier_type": "hybrid",
-            "yolo_available": True,
+            "classifier_type": "gpt",
+            "yolo_available": False,
             "gpt_available": bool(OPENAI_API_KEY),
             "valid_colors": TrashClassification.VALID_COLORS
         }

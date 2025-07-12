@@ -1,249 +1,133 @@
 """
-Media display module for iTrash system.
-Handles user interface and image transitions.
+Simple media display module for iTrash system.
+Handles image switching without complex GUI.
 """
 
-import threading
-import time
 import os
-import subprocess
-import sys
-from tkinter import Tk, Label, Frame
-from PIL import Image, ImageTk
-import pyautogui
+import time
+import shutil
+import threading
 from config.settings import DisplayConfig, SystemStates
-from core.database import db_manager
+from api.state import state
 
-class MediaDisplay:
-    """Main display interface for iTrash system"""
+class SimpleMediaDisplay:
+    """Simple display interface that copies images to standard location"""
     
     def __init__(self, images_dir="display/images"):
         self.images_dir = images_dir
         self.acc = 0
         self.last_acc = 0
-        self.browser_opened = False
-        self.root = None
-        self.frame = None
-        self.label = None
-        self.tk_image = None
-        self.timer_thread = None
         self.is_running = False
+        self.timer_thread = None
+        
+        # Standard location for current image
+        self.current_image_path = "/tmp/itrash_current.png"
         
         # Load image mapping
-        self.media = self._load_media()
+        self.image_mapping = DisplayConfig.IMAGE_MAPPING
         
-        # Initialize database connection
-        if not db_manager.is_connected:
-            db_manager.connect()
+        # Initialize state connection
+        pass
     
-    def _load_media(self):
-        """Load media items from configuration"""
-        media = []
-        for acc_value, image_file in DisplayConfig.IMAGE_MAPPING.items():
-            image_path = os.path.join(self.images_dir, image_file)
-            if os.path.exists(image_path):
-                media.append({
-                    'type': 'image',
-                    'file': image_path,
-                    'acc_value': acc_value
-                })
-            else:
-                print(f"Warning: Image file not found: {image_path}")
+    def show_image(self, state_number):
+        """Show image for given state number"""
+        if state_number not in self.image_mapping:
+            print(f"Unknown state: {state_number}")
+            return False
         
-        return media
-    
-    def _get_image_by_acc(self, acc_value):
-        """Get image file path by accumulator value"""
-        for item in self.media:
-            if item.get('acc_value') == acc_value:
-                return item['file']
-        return None
-    
-    def init_ui(self):
-        """Initialize the user interface"""
-        self.root = Tk()
-        self.root.title("iTrash Media Display")
+        image_file = self.image_mapping[state_number]
+        source_path = os.path.join(self.images_dir, image_file)
         
-        if DisplayConfig.FULLSCREEN:
-            # Raspberry Pi specific fullscreen handling
-            self.root.attributes('-fullscreen', True)
-            # Hide cursor in fullscreen mode
-            self.root.config(cursor="none")
+        if not os.path.exists(source_path):
+            print(f"Image file not found: {source_path}")
+            return False
         
-        self.frame = Frame(self.root)
-        self.frame.pack(fill='both', expand=True)
-        
-        self.label = Label(self.frame)
-        self.label.pack(fill='both', expand=True)
-        
-        # Bind escape key to quit
-        self.root.bind("<Escape>", lambda event: self.quit())
-        
-        # Bind other keys for debugging
-        self.root.bind("<Key>", self._handle_key_press)
-        
-        # Bind mouse click to quit (useful for touchscreens)
-        self.root.bind("<Button-1>", lambda event: self.quit())
-    
-    def _handle_key_press(self, event):
-        """Handle key press events"""
-        if event.char == 'q':
-            self.quit()
-        elif event.char == 'r':
-            self.refresh_display()
-        elif event.char == 'b':
-            self.toggle_browser()
-        elif event.char == 'f':
-            self.toggle_fullscreen()
-    
-    def toggle_fullscreen(self):
-        """Toggle fullscreen mode"""
-        if self.root:
-            current_state = self.root.attributes('-fullscreen')
-            self.root.attributes('-fullscreen', not current_state)
-    
-    def show_media(self):
-        """Show media based on current accumulator value"""
-        if not (0 <= self.acc < len(DisplayConfig.IMAGE_MAPPING)):
-            print(f"Index {self.acc} out of range.")
-            return
-        
-        if self.acc == SystemStates.IDLE:
-            # For Raspberry Pi, we'll show a simple idle screen instead of browser
-            self.show_idle_screen()
-        elif self.acc == SystemStates.REWARD:
-            # Show reward image for 5 seconds then reset
-            self.restore_and_show_image()
-            time.sleep(DisplayConfig.IMAGE_DISPLAY_DELAY)
-            db_manager.update_acc(SystemStates.IDLE)
-        else:
-            if self.acc != self.last_acc:
-                self.restore_and_show_image()
-                self.last_acc = self.acc
-    
-    def show_idle_screen(self):
-        """Show idle screen for Raspberry Pi"""
-        # Show a simple white screen or logo instead of browser
-        image_file = self._get_image_by_acc(SystemStates.IDLE)
-        if image_file:
-            self.show_image(image_file)
-    
-    def switch_to_chromium(self):
-        """Switch to Chromium browser window - disabled for Raspberry Pi"""
-        print("Browser switching disabled on Raspberry Pi")
-        # This function is kept for compatibility but doesn't work on RPi
-    
-    def minimize_chromium(self):
-        """Minimize Chromium browser window - disabled for Raspberry Pi"""
-        print("Browser switching disabled on Raspberry Pi")
-        # This function is kept for compatibility but doesn't work on RPi
-    
-    def toggle_browser(self):
-        """Toggle browser visibility - disabled for Raspberry Pi"""
-        print("Browser switching disabled on Raspberry Pi")
-    
-    def restore_and_show_image(self):
-        """Restore the Tkinter window and show image"""
-        if self.root:
-            self.root.deiconify()  # Restore the window if it was minimized
-        
-        image_file = self._get_image_by_acc(self.acc)
-        if image_file:
-            self.show_image(image_file)
-        else:
-            print(f"No image found for ACC value: {self.acc}")
-    
-    def show_image(self, file_path):
-        """Display image on the interface"""
         try:
-            image = Image.open(file_path)
-            image = image.convert("RGB")
-            image = image.resize(
-                (DisplayConfig.WINDOW_WIDTH, DisplayConfig.WINDOW_HEIGHT),
-                Image.Resampling.LANCZOS
-            )
-            self.tk_image = ImageTk.PhotoImage(image)
-            self.label.config(image=self.tk_image)
+            # Copy image to standard location
+            shutil.copy2(source_path, self.current_image_path)
+            print(f"Displaying: {image_file} (State: {state_number})")
+            return True
         except Exception as e:
-            print(f"Error loading image {file_path}: {e}")
-            self.next_media()
-    
-    def next_media(self):
-        """Move to next media item"""
-        self.acc = (self.acc + 1) % len(DisplayConfig.IMAGE_MAPPING)
-        self.show_media()
+            print(f"Error copying image: {e}")
+            return False
     
     def set_acc(self, value):
         """Set accumulator value and update display"""
-        if 0 <= value < len(DisplayConfig.IMAGE_MAPPING):
+        if value in self.image_mapping:
             self.acc = value
-            self.show_media()
+            self.show_image(value)
         else:
-            print(f"Invalid index: {value}. Must be between 0 and {len(DisplayConfig.IMAGE_MAPPING) - 1}.")
+            print(f"Invalid state: {value}")
     
-    def get_acc_mongo(self):
-        """Monitor MongoDB for accumulator changes"""
-        acc_timer = None
+    def monitor_state(self):
+        """Monitor local state for phase changes"""
+        phase_timer = None
         
         while self.is_running:
             time.sleep(0.1)
             
             try:
-                new_acc = db_manager.get_acc_value()
-                if new_acc is not None:
-                    self.set_acc(new_acc)
+                current_phase = state.get("phase", "idle")
+                
+                # Map phase to state number
+                phase_to_state = {
+                    "idle": 0,
+                    "processing": 1,
+                    "show_trash": 2,
+                    "user_confirmation": 3,
+                    "reward": 4,
+                    "timeout": 5,
+                    "error": 6
+                }
+                
+                new_state = phase_to_state.get(current_phase, 0)
+                
+                if new_state != self.acc:
+                    self.set_acc(new_state)
                     
-                    # Handle timeout for ACC == 3 (user confirmation)
-                    if new_acc == SystemStates.USER_CONFIRMATION:
-                        if acc_timer is None:
-                            acc_timer = time.time()
-                        elif time.time() - acc_timer >= 10:  # 10 second timeout
-                            db_manager.update_acc(SystemStates.IDLE)
-                            acc_timer = None
+                    # Handle timeout for user confirmation (state 3)
+                    if current_phase == "user_confirmation":
+                        if phase_timer is None:
+                            phase_timer = time.time()
+                        elif time.time() - phase_timer >= 10:  # 10 second timeout
+                            state.update("phase", "idle")
+                            phase_timer = None
                     else:
-                        acc_timer = None
+                        phase_timer = None
                         
             except Exception as e:
-                print(f"Error monitoring MongoDB: {e}")
-                time.sleep(1)  # Wait longer on error
-    
-    def refresh_display(self):
-        """Refresh the display"""
-        if self.root:
-            self.root.update()
+                print(f"Error monitoring state: {e}")
+                time.sleep(1)
     
     def start(self):
-        """Start the media display"""
+        """Start the display system"""
         self.is_running = True
         
-        # Initialize UI
-        self.init_ui()
-        
-        # Show initial media
-        self.show_media()
+        # Show initial image
+        self.show_image(SystemStates.IDLE)
         
         # Start monitoring thread
-        self.timer_thread = threading.Thread(target=self.get_acc_mongo)
+        self.timer_thread = threading.Thread(target=self.monitor_state)
         self.timer_thread.daemon = True
         self.timer_thread.start()
         
-        # Start main loop
-        self.root.mainloop()
+        print("Simple display system started")
+        print(f"Current image location: {self.current_image_path}")
+        print("Use any image viewer to display this file in fullscreen")
     
-    def quit(self):
-        """Quit the application"""
+    def stop(self):
+        """Stop the display system"""
         self.is_running = False
-        if self.root:
-            self.root.quit()
+        if self.timer_thread:
+            self.timer_thread.join(timeout=1)
+        print("Simple display system stopped")
     
     def get_status(self):
         """Get current status"""
         return {
             "acc": self.acc,
-            "last_acc": self.last_acc,
-            "browser_opened": self.browser_opened,
-            "is_running": self.is_running,
-            "media_count": len(self.media)
+            "current_image": self.current_image_path,
+            "is_running": self.is_running
         }
 
 
@@ -256,7 +140,7 @@ class DisplayManager:
     def start_display(self, images_dir="display/images"):
         """Start the display system"""
         try:
-            self.display = MediaDisplay(images_dir)
+            self.display = SimpleMediaDisplay(images_dir)
             self.display.start()
         except Exception as e:
             print(f"Error starting display: {e}")
@@ -264,13 +148,38 @@ class DisplayManager:
     def stop_display(self):
         """Stop the display system"""
         if self.display:
-            self.display.quit()
+            self.display.stop()
     
     def get_display_status(self):
         """Get display status"""
         if self.display:
             return self.display.get_status()
         return {"error": "Display not initialized"}
+
+
+# Utility function to manually show specific states
+def show_state(state_number):
+    """Utility function to manually show a specific state"""
+    display = SimpleMediaDisplay()
+    display.show_image(state_number)
+    print(f"Showing state {state_number}. Image available at: {display.current_image_path}")
+
+
+if __name__ == "__main__":
+    # Test the display system
+    display = SimpleMediaDisplay()
+    display.start()
+    
+    try:
+        # Test different states
+        for state in [0, 1, 2, 3, 4]:
+            print(f"\nTesting state {state}...")
+            display.show_image(state)
+            time.sleep(2)
+    except KeyboardInterrupt:
+        print("\nStopping display...")
+    finally:
+        display.stop()
 
 
  

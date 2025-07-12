@@ -40,6 +40,12 @@ typing_extensions==4.14.1
 tzdata==2025.2
 urllib3==2.5.0
 pynput==1.7.6
+# API and MQTT dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+paho-mqtt==1.6.1
+python-multipart==0.0.6
+
 # Raspberry Pi specific dependencies
 rpi_ws281x==1.0.0
 RPi.GPIO==0.7.1

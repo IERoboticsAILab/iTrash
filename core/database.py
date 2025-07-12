@@ -111,7 +111,7 @@ class DatabaseManager:
                 "real_class": real_class,
                 "person_thrown": person_thrown,
                 "timestamp": datetime.now(),
-                "classification_method": "hybrid"  # Could be "yolo", "gpt", or "hybrid"
+                "classification_method": "gpt"  # Could be "yolo", "gpt", or "hybrid"
             }
             
             result = image_collection.insert_one(document)

@@ -26,11 +26,6 @@ class LEDStrip:
         self.strip.begin()
         self.clear_all()
     
-    def set_pixel_color(self, pixel_index, color):
-        """Set color of a specific pixel"""
-        self.strip.setPixelColor(pixel_index, Color(*color))
-        self.strip.show()
-    
     def set_color_all(self, color):
         """Set all LEDs to the same color"""
         for i in range(HardwareConfig.LED_COUNT):
@@ -41,128 +36,12 @@ class LEDStrip:
         """Turn off all LEDs"""
         self.set_color_all(Colors.EMPTY)
     
-    def set_white_all(self):
-        """Set all LEDs to white"""
-        self.set_color_all(Colors.WHITE)
-    
-    def set_colors(self, colors):
-        """Set multiple LEDs to different colors"""
-        for i, color in enumerate(colors):
-            if i < HardwareConfig.LED_COUNT:
-                self.strip.setPixelColor(i, Color(*color))
-        self.strip.show()
-    
-    def set_color_range_percent(self, color, start_percent, end_percent):
-        """Set colors based on start and end percentages"""
-        start_index = int(HardwareConfig.LED_COUNT * start_percent)
-        end_index = int(HardwareConfig.LED_COUNT * end_percent)
-        index_range = end_index - start_index
-        
-        if end_index < start_index:
-            index_range = HardwareConfig.LED_COUNT - end_index + start_index
-        
-        for i in range(index_range):
-            self.strip.setPixelColor((start_index + i) % HardwareConfig.LED_COUNT, Color(*color))
-        
-        self.strip.show()
-    
-    def set_color_range_exact(self, color, start_index, end_index):
-        """Set colors based on exact start and end indices"""
-        index_range = end_index - start_index
-        
-        if end_index < start_index:
-            index_range = HardwareConfig.LED_COUNT - end_index + start_index
-        
-        for i in range(index_range):
-            self.strip.setPixelColor((start_index + i) % HardwareConfig.LED_COUNT, Color(*color))
-        
-        self.strip.show()
-    
-    def wheel(self, pos):
-        """Generate rainbow colors across 0-255 positions"""
-        if pos < 85:
-            return Color(pos * 3, 255 - pos * 3, 0)
-        elif pos < 170:
-            pos -= 85
-            return Color(255 - pos * 3, 0, pos * 3)
-        else:
-            pos -= 170
-            return Color(0, pos * 3, 255 - pos * 3)
-    
-    def glow(self, color, wait_ms=10):
-        """Glowing effect - fade in and out"""
-        # Fade In
-        for i in range(0, 256):
-            r = int(math.floor((i / 256.0) * color[0]))
-            g = int(math.floor((i / 256.0) * color[1]))
-            b = int(math.floor((i / 256.0) * color[2]))
-            self.set_color_all((r, g, b))
-            time.sleep(wait_ms / 1000.0)
-        
-        # Fade Out
-        for i in range(256, 0, -1):
-            r = int(math.floor((i / 256.0) * color[0]))
-            g = int(math.floor((i / 256.0) * color[1]))
-            b = int(math.floor((i / 256.0) * color[2]))
-            self.set_color_all((r, g, b))
-            time.sleep(wait_ms / 1000.0)
-    
-    def color_wipe(self, color, wait_ms=50):
-        """Wipe color across the display one pixel at a time"""
-        for i in range(self.strip.numPixels()):
-            self.strip.setPixelColor(i, Color(*color))
-            self.strip.show()
-            time.sleep(wait_ms / 1000.0)
-    
-    def sparkle(self, color, wait_ms=50, cumulative=False):
-        """Display random pixels across the display"""
-        self.clear_all()
-        for i in range(0, HardwareConfig.LED_COUNT):
-            self.strip.setPixelColor(random.randrange(0, HardwareConfig.LED_COUNT), Color(*color))
-            self.strip.show()
-            time.sleep(wait_ms / 1000.0)
-            if not cumulative:
-                self.clear_all()
-        time.sleep(wait_ms / 1000.0)
-    
-    def rainbow(self, wait_ms=50, iterations=1):
-        """Draw rainbow that fades across all pixels at once"""
-        for j in range(256 * iterations):
-            for i in range(self.strip.numPixels()):
-                self.strip.setPixelColor(i, self.wheel((i + j) & 255))
-            self.strip.show()
-            time.sleep(wait_ms / 1000.0)
-    
-    def theater_chase(self, color, wait_ms=50, iterations=10):
-        """Movie theater light style chaser animation"""
-        for j in range(iterations):
-            for q in range(3):
-                for i in range(0, self.strip.numPixels(), 3):
-                    self.strip.setPixelColor(i + q, Color(*color))
-                self.strip.show()
-                time.sleep(wait_ms / 1000.0)
-                for i in range(0, self.strip.numPixels(), 3):
-                    self.strip.setPixelColor(i + q, 0)
-    
-    def running(self, wait_ms=10, duration_ms=6000, width=1):
-        """Running light effect"""
-        self.clear_all()
-        index = 0
-        while duration_ms > 0:
-            self.strip.setPixelColor((index - width) % HardwareConfig.LED_COUNT, Color(0, 0, 0))
-            self.strip.setPixelColor(index, Color(255, 0, 0))
-            self.strip.show()
-            index = (index + 1) % HardwareConfig.LED_COUNT
-            duration_ms -= wait_ms
-            time.sleep(wait_ms / 1000)
-
 
 class ProximitySensors:
     """Proximity sensor controller"""
     
     def __init__(self):
         GPIO.setmode(GPIO.BCM)
-        GPIO.setwarnings(False)
         
         # Initialize all proximity sensors
         self.detect_object_sensor = self._initialize_sensor(HardwareConfig.DETECT_OBJECT_SENSOR_PIN)
@@ -226,19 +105,6 @@ class HardwareController:
         """Clean up all hardware resources"""
         self.led_strip.clear_all()
         self.proximity_sensors.cleanup()
-    
-    def blink_leds(self, color, duration=1.0, interval=0.5):
-        """Blink all LEDs with specified color"""
-        start_time = time.time()
-        while time.time() - start_time < duration:
-            self.led_strip.set_color_all(color)
-            time.sleep(interval)
-            self.led_strip.clear_all()
-            time.sleep(interval)
-    
-    def show_processing_animation(self):
-        """Show processing animation on LED strip"""
-        self.led_strip.running(wait_ms=50, duration_ms=3000, width=3)
     
     def show_success_animation(self):
         """Show success animation on LED strip"""
