@@ -26,6 +26,7 @@ class iTrashSystemDev:
         self.classifier = None
         self.display_manager = None
         self.camera_feed = None
+        self.camera_display_thread = None
         self.is_running = False
         self.display_thread = None
         
@@ -105,6 +106,65 @@ class iTrashSystemDev:
                 print("Camera feed started successfully")
             except Exception as e:
                 print(f"Error starting camera feed: {e}")
+    
+    def start_virtual_camera_display(self):
+        """Start a virtual camera display in a separate window"""
+        if not self.camera or not self.camera.is_initialized:
+            print("Camera not available for virtual display")
+            return
+        
+        try:
+            import cv2
+            import threading
+            
+            def camera_display_loop():
+                """Camera display loop in separate thread"""
+                window_name = "iTrash Camera Feed"
+                cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+                cv2.resizeWindow(window_name, 800, 600)
+                
+                print(f"📷 Virtual camera display started: {window_name}")
+                print("   Press 'q' in camera window to close")
+                
+                while self.is_running:
+                    try:
+                        ret, frame = self.camera.read_frame()
+                        if not ret:
+                            print("Failed to read frame from camera")
+                            break
+                        
+                        # Add overlay information
+                        overlay = frame.copy()
+                        
+                        # Add title
+                        cv2.putText(overlay, "iTrash Camera Feed", (10, 30), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                        
+                        # Add status info
+                        cv2.putText(overlay, "Press 'q' to close", (10, overlay.shape[0] - 20), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
+                        
+                        # Display frame
+                        cv2.imshow(window_name, overlay)
+                        
+                        # Check for quit key
+                        if cv2.waitKey(1) & 0xFF == ord('q'):
+                            break
+                            
+                    except Exception as e:
+                        print(f"Error in camera display: {e}")
+                        break
+                
+                cv2.destroyAllWindows()
+                print("📷 Virtual camera display closed")
+            
+            # Start camera display in separate thread
+            self.camera_display_thread = threading.Thread(target=camera_display_loop, daemon=True)
+            self.camera_display_thread.start()
+            print("✅ Virtual camera display started successfully")
+            
+        except Exception as e:
+            print(f"Error starting virtual camera display: {e}")
     
     async def wait_for_user_confirmation(self, trash_class):
         """Wait for user confirmation of classification"""
@@ -258,6 +318,9 @@ class iTrashSystemDev:
         
         # Start camera feed
         self.start_camera_feed()
+
+        # Start virtual camera display
+        self.start_virtual_camera_display()
         
         # Start main loop
         try:
@@ -275,6 +338,11 @@ class iTrashSystemDev:
         # Stop camera feed
         if self.camera_feed:
             self.camera_feed.stop_feed()
+        
+        # Stop virtual camera display
+        if self.camera_display_thread and self.camera_display_thread.is_alive():
+            self.camera_display_thread.join()
+            print("Virtual camera display thread joined")
         
         # Cleanup hardware
         if self.hardware:
