@@ -8,7 +8,7 @@ import time
 import shutil
 import threading
 from config.settings import DisplayConfig, SystemStates
-from api.state import state
+from global_state import state
 
 class SimpleMediaDisplay:
     """Simple display interface that copies images to standard location"""

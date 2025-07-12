@@ -1,6 +1,6 @@
 """
-Unified server runner for iTrash system.
-Combines FastAPI and MQTT in a single process.
+Unified iTrash system - combines hardware loop, FastAPI, and MQTT.
+Single entry point for the complete hybrid system.
 """
 
 import asyncio
@@ -13,20 +13,41 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.endpoints import router
 from api.mqtt_client import start_mqtt, stop_mqtt
+from core.hardware_loop import start_hardware_loop, stop_hardware_loop
+from display.media_display import DisplayManager
 from global_state import state
 
 # Global variables for graceful shutdown
 server = None
 mqtt_client = None
+hardware_loop = None
+display_manager = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan"""
     # Startup
-    print("Starting iTrash API server...")
+    print("Starting unified iTrash system...")
     
     # Initialize state
     state.update("system_status", "starting")
+    
+    # Start display manager
+    global display_manager
+    try:
+        display_manager = DisplayManager()
+        display_manager.start_display()
+        print("Display manager started")
+    except Exception as e:
+        print(f"Failed to start display manager: {e}")
+    
+    # Start background hardware loop
+    global hardware_loop
+    try:
+        hardware_loop = start_hardware_loop()
+        print("Hardware loop started")
+    except Exception as e:
+        print(f"Failed to start hardware loop: {e}")
     
     # Start MQTT client
     global mqtt_client
@@ -38,12 +59,26 @@ async def lifespan(app: FastAPI):
     
     # Update state
     state.update("system_status", "running")
-    print("iTrash API server started successfully")
+    print("Unified iTrash system started successfully")
+    print("✅ Hardware loop running in background")
+    print("✅ FastAPI server available at http://localhost:8000")
+    print("✅ MQTT client listening for messages")
+    print("✅ Display system monitoring state changes")
     
     yield
     
     # Shutdown
-    print("Shutting down iTrash API server...")
+    print("Shutting down unified iTrash system...")
+    
+    # Stop display manager
+    if display_manager:
+        display_manager.stop_display()
+        print("Display manager stopped")
+    
+    # Stop hardware loop
+    if hardware_loop:
+        stop_hardware_loop()
+        print("Hardware loop stopped")
     
     # Stop MQTT client
     if mqtt_client:
@@ -52,14 +87,14 @@ async def lifespan(app: FastAPI):
     
     # Update state
     state.update("system_status", "stopped")
-    print("iTrash API server stopped")
+    print("Unified iTrash system stopped")
 
 def create_app() -> FastAPI:
     """Create FastAPI application"""
     app = FastAPI(
-        title="iTrash API",
-        description="API for iTrash smart waste management system",
-        version="1.0.0",
+        title="iTrash Unified System",
+        description="Unified iTrash system with hardware loop, API, and MQTT",
+        version="2.0.0",
         lifespan=lifespan
     )
     

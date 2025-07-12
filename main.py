@@ -15,7 +15,7 @@ from core.hardware import HardwareController
 from core.camera import CameraController
 from core.ai_classifier import ClassificationManager
 from display.media_display import DisplayManager
-from api.state import state
+from global_state import state
 
 class iTrashSystem:
     """Main iTrash system controller"""

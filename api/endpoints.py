@@ -13,51 +13,31 @@ from PIL import Image
 import cv2
 import numpy as np
 
-from api.state import state
+from global_state import state
 from core.ai_classifier import ClassificationManager
 from core.camera import CameraController
 from core.hardware import HardwareController
 
 router = APIRouter()
 
-# Initialize components (will be lazy-loaded)
-_hardware: Optional[HardwareController] = None
-_camera: Optional[CameraController] = None
-_classifier: Optional[ClassificationManager] = None
-
+# Get components from hardware loop
 def get_hardware() -> Optional[HardwareController]:
-    """Get hardware controller instance"""
-    global _hardware
-    if _hardware is None:
-        try:
-            _hardware = HardwareController()
-        except Exception as e:
-            print(f"Hardware initialization failed: {e}")
-    return _hardware
+    """Get hardware controller instance from hardware loop"""
+    from core.hardware_loop import get_hardware_loop
+    hardware_loop = get_hardware_loop()
+    return hardware_loop.hardware if hardware_loop else None
 
 def get_camera() -> Optional[CameraController]:
-    """Get camera controller instance"""
-    global _camera
-    if _camera is None:
-        try:
-            _camera = CameraController()
-            if not _camera.initialize():
-                _camera = None
-        except Exception as e:
-            print(f"Camera initialization failed: {e}")
-    return _camera
+    """Get camera controller instance from hardware loop"""
+    from core.hardware_loop import get_hardware_loop
+    hardware_loop = get_hardware_loop()
+    return hardware_loop.camera if hardware_loop else None
 
 def get_classifier() -> Optional[ClassificationManager]:
-    """Get classifier instance"""
-    global _classifier
-    if _classifier is None:
-        try:
-            hardware = get_hardware()
-            led_strip = hardware.get_led_strip() if hardware else None
-            _classifier = ClassificationManager(led_strip)
-        except Exception as e:
-            print(f"Classifier initialization failed: {e}")
-    return _classifier
+    """Get classifier instance from hardware loop"""
+    from core.hardware_loop import get_hardware_loop
+    hardware_loop = get_hardware_loop()
+    return hardware_loop.classifier if hardware_loop else None
 
 @router.get("/")
 async def root():

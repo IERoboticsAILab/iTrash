@@ -7,7 +7,7 @@ import json
 import threading
 import time
 from typing import Optional, Callable
-from api.state import state
+from global_state import state
 
 # Try to import paho-mqtt, but don't fail if not available
 try:
