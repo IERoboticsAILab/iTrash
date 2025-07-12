@@ -6,6 +6,7 @@ Provides keyboard triggers for proximity sensors and continuous camera feed.
 import cv2
 import threading
 import time
+import logging
 from pynput import keyboard
 from config.settings import HardwareConfig, Colors
 
@@ -17,6 +18,7 @@ class ManualProximitySensors:
         self.blue_bin_triggered = False
         self.yellow_bin_triggered = False
         self.brown_bin_triggered = False
+        self.logger = logging.getLogger(__name__)
         
         # Keyboard mapping
         self.key_mapping = {
@@ -31,14 +33,14 @@ class ManualProximitySensors:
         self.listener = keyboard.Listener(on_press=self._on_key_press)
         self.listener.start()
         
-        print("Manual proximity sensors initialized")
-        print("Keyboard controls:")
-        print("  'o' - Trigger main object detection")
-        print("  'b' - Trigger blue bin proximity")
-        print("  'y' - Trigger yellow bin proximity")
-        print("  'r' - Trigger brown bin proximity")
-        print("  'c' - Clear all triggers")
-        print("  'q' - Quit camera feed")
+        self.logger.info("Manual proximity sensors initialized")
+        self.logger.info("Keyboard controls:")
+        self.logger.info("  'o' - Trigger main object detection")
+        self.logger.info("  'b' - Trigger blue bin proximity")
+        self.logger.info("  'y' - Trigger yellow bin proximity")
+        self.logger.info("  'r' - Trigger brown bin proximity")
+        self.logger.info("  'c' - Clear all triggers")
+        self.logger.info("  'q' - Quit camera feed")
     
     def _on_key_press(self, key):
         """Handle key press events"""
@@ -50,19 +52,19 @@ class ManualProximitySensors:
                     
                     if action == 'object_detection':
                         self.object_detected = True
-                        print("🔍 Object detection triggered!")
+                        self.logger.info("🔍 Object detection triggered!")
                     elif action == 'blue_bin':
                         self.blue_bin_triggered = True
-                        print("🔵 Blue bin triggered!")
+                        self.logger.info("🔵 Blue bin triggered!")
                     elif action == 'yellow_bin':
                         self.yellow_bin_triggered = True
-                        print("🟡 Yellow bin triggered!")
+                        self.logger.info("🟡 Yellow bin triggered!")
                     elif action == 'brown_bin':
                         self.brown_bin_triggered = True
-                        print("🟤 Brown bin triggered!")
+                        self.logger.info("🟤 Brown bin triggered!")
                     elif action == 'clear_all':
                         self.clear_all_triggers()
-                        print("🧹 All triggers cleared!")
+                        self.logger.info("🧹 All triggers cleared!")
                         
         except AttributeError:
             pass
@@ -73,11 +75,13 @@ class ManualProximitySensors:
         self.blue_bin_triggered = False
         self.yellow_bin_triggered = False
         self.brown_bin_triggered = False
+        self.logger.debug("All sensor triggers cleared")
     
     def detect_object_proximity(self):
         """Detect object on the main object detection sensor"""
         if self.object_detected:
             self.object_detected = False  # Reset after detection
+            self.logger.info("Object proximity detected")
             return True
         return False
     
@@ -85,6 +89,7 @@ class ManualProximitySensors:
         """Detect object in blue bin"""
         if self.blue_bin_triggered:
             self.blue_bin_triggered = False  # Reset after detection
+            self.logger.info("Blue bin detection triggered")
             return True
         return False
     
@@ -92,6 +97,7 @@ class ManualProximitySensors:
         """Detect object in yellow bin"""
         if self.yellow_bin_triggered:
             self.yellow_bin_triggered = False  # Reset after detection
+            self.logger.info("Yellow bin detection triggered")
             return True
         return False
     
@@ -99,12 +105,14 @@ class ManualProximitySensors:
         """Detect object in brown bin"""
         if self.brown_bin_triggered:
             self.brown_bin_triggered = False  # Reset after detection
+            self.logger.info("Brown bin detection triggered")
             return True
         return False
     
     def cleanup(self):
         """Clean up keyboard listener"""
         if self.listener:
+            self.logger.info("Cleaning up keyboard listener")
             self.listener.stop()
 
 
@@ -115,17 +123,19 @@ class CameraFeedDisplay:
         self.camera = camera_controller
         self.is_running = False
         self.display_thread = None
+        self.logger = logging.getLogger(__name__)
+        self.frame_count = 0
         
     def start_feed(self):
         """Start continuous camera feed in a separate thread"""
         if not self.camera or not self.camera.is_initialized:
-            print("Camera not available for feed display")
+            self.logger.warning("Camera not available for feed display")
             return
         
         self.is_running = True
         self.display_thread = threading.Thread(target=self._display_loop, daemon=True)
         self.display_thread.start()
-        print("Camera feed started")
+        self.logger.info("Camera feed started")
     
     def _display_loop(self):
         """Main display loop for camera feed"""
@@ -134,13 +144,16 @@ class CameraFeedDisplay:
         
         # Set window size
         cv2.resizeWindow(window_name, 800, 600)
+        self.logger.info(f"Camera feed window created: {window_name}")
         
         while self.is_running:
             try:
                 ret, frame = self.camera.read_frame()
                 if not ret:
-                    print("Failed to read frame from camera")
+                    self.logger.error("Failed to read frame from camera")
                     break
+                
+                self.frame_count += 1
                 
                 # Add overlay information
                 frame_with_overlay = self._add_overlay(frame)
@@ -150,14 +163,15 @@ class CameraFeedDisplay:
                 
                 # Check for quit key
                 if cv2.waitKey(1) & 0xFF == ord('q'):
+                    self.logger.info("Quit key pressed, stopping camera feed")
                     break
                     
             except Exception as e:
-                print(f"Error in camera feed: {e}")
+                self.logger.error(f"Error in camera feed: {e}")
                 break
         
         cv2.destroyAllWindows()
-        print("Camera feed stopped")
+        self.logger.info(f"Camera feed stopped after {self.frame_count} frames")
     
     def _add_overlay(self, frame):
         """Add information overlay to camera frame"""
@@ -186,7 +200,7 @@ class CameraFeedDisplay:
         
         # Add frame info
         height, width = frame.shape[:2]
-        frame_info = f"Frame: {width}x{height}"
+        frame_info = f"Frame: {width}x{height} (#{self.frame_count})"
         cv2.putText(overlay, frame_info, (10, height - 20), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
         
@@ -194,35 +208,44 @@ class CameraFeedDisplay:
     
     def stop_feed(self):
         """Stop camera feed"""
+        self.logger.info("Stopping camera feed...")
         self.is_running = False
         if self.display_thread:
             self.display_thread.join(timeout=1)
+            self.logger.info("Camera feed thread stopped")
 
 
 class ManualHardwareController:
-    """Manual hardware controller that combines LED strip and manual proximity sensors"""
+    """Manual hardware controller for development and testing"""
     
     def __init__(self, led_strip):
         self.led_strip = led_strip
         self.proximity_sensors = ManualProximitySensors()
+        self.logger = logging.getLogger(__name__)
+        self.animation_count = 0
     
     def get_led_strip(self):
         """Get LED strip instance"""
         return self.led_strip
     
     def get_proximity_sensors(self):
-        """Get manual proximity sensors instance"""
+        """Get proximity sensors instance"""
         return self.proximity_sensors
     
     def cleanup(self):
-        """Clean up all hardware resources"""
+        """Clean up hardware resources"""
+        self.logger.info("Cleaning up manual hardware controller")
         if self.led_strip:
             self.led_strip.clear_all()
         if self.proximity_sensors:
             self.proximity_sensors.cleanup()
+        self.logger.info("Manual hardware controller cleanup complete")
     
     def blink_leds(self, color, duration=1.0, interval=0.5):
-        """Blink all LEDs with specified color"""
+        """Blink LEDs with specified color"""
+        self.logger.debug(f"Blinking LEDs with color {color} for {duration}s")
+        self.animation_count += 1
+        
         if self.led_strip:
             start_time = time.time()
             while time.time() - start_time < duration:
@@ -232,16 +255,16 @@ class ManualHardwareController:
                 time.sleep(interval)
     
     def show_processing_animation(self):
-        """Show processing animation on LED strip"""
-        if self.led_strip:
-            self.led_strip.running(wait_ms=50, duration_ms=3000, width=3)
+        """Show processing animation"""
+        self.logger.info("Showing processing animation")
+        self.blink_leds((255, 255, 255), duration=2.0, interval=0.3)
     
     def show_success_animation(self):
-        """Show success animation on LED strip"""
-        if self.led_strip:
-            self.led_strip.glow(Colors.GREEN, wait_ms=20)
+        """Show success animation"""
+        self.logger.info("Showing success animation")
+        self.blink_leds((0, 255, 0), duration=1.5, interval=0.2)
     
     def show_error_animation(self):
-        """Show error animation on LED strip"""
-        if self.led_strip:
-            self.led_strip.blink_leds(Colors.RED, duration=2.0, interval=0.3) 
+        """Show error animation"""
+        self.logger.info("Showing error animation")
+        self.blink_leds((255, 0, 0), duration=1.5, interval=0.2)
