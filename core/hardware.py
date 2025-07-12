@@ -246,4 +246,9 @@ class HardwareController:
     
     def show_error_animation(self):
         """Show error animation on LED strip"""
-        self.led_strip.blink_leds(Colors.RED, duration=2.0, interval=0.3) 
+        start_time = time.time()
+        while time.time() - start_time < 2.0:
+            self.led_strip.set_color_all(Colors.RED)
+            time.sleep(0.3)
+            self.led_strip.clear_all()
+            time.sleep(0.3) 
