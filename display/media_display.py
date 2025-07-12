@@ -273,16 +273,4 @@ class DisplayManager:
         return {"error": "Display not initialized"}
 
 
-def test_display():
-    """Test the display system"""
-    manager = DisplayManager()
-    try:
-        manager.start_display()
-    except KeyboardInterrupt:
-        print("Display test interrupted")
-    finally:
-        manager.stop_display()
-
-
-if __name__ == "__main__":
-    test_display() 
+ 

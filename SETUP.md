@@ -82,11 +82,6 @@ YOLO_API_KEY=your_yolo_api_key
 
 ## 🧪 Testing
 
-### Run All Tests
-```bash
-python test_system.py
-```
-
 ### Test Individual Components
 ```bash
 # Test database
@@ -103,22 +98,12 @@ python -c "from core.camera import CameraController; c = CameraController(); pri
 
 ### Complete System
 ```bash
-python start.py --mode main
-```
-
-### Display Only
-```bash
-python start.py --mode display
+python main.py
 ```
 
 ### Analytics Dashboard
 ```bash
-python start.py --mode analytics
-```
-
-### Skip Checks (for development)
-```bash
-python start.py --mode main --skip-checks
+streamlit run analytics/dashboard.py
 ```
 
 ## 📊 System Architecture
@@ -126,8 +111,6 @@ python start.py --mode main --skip-checks
 ```
 iTrash/
 ├── main.py                 # Main application
-├── start.py               # Startup script
-├── test_system.py         # System tests
 ├── requirements.txt       # Dependencies
 ├── env.template          # Environment template
 ├── config/
@@ -188,12 +171,7 @@ The system uses an accumulator (ACC) value to track states:
    - Check internet connectivity
    - Test API endpoints manually
 
-### Debug Mode
-```bash
-# Enable debug logging
-export PYTHONPATH=.
-python -c "import logging; logging.basicConfig(level=logging.DEBUG); from main import main; main()"
-```
+
 
 ## 📈 Analytics
 
@@ -219,15 +197,13 @@ db_manager.export_to_csv("data_export.csv")
 
 ### Adding New Features
 1. Create feature branch
-2. Add tests in `test_system.py`
-3. Update documentation
-4. Submit pull request
+2. Update documentation
+3. Submit pull request
 
 ### Code Structure
 - Follow PEP 8 style guide
 - Add docstrings to all functions
 - Use type hints where possible
-- Write unit tests for new features
 
 ## 🤝 Support
 
