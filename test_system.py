@@ -217,14 +217,85 @@ def test_display():
     
     try:
         from display.media_display import DisplayManager
+        from config.settings import DisplayConfig, SystemStates
+        import os
         
         # Test display manager initialization
         manager = DisplayManager()
         print("✅ Display manager initialized")
         
+        # Check if display images exist
+        images_dir = "display/images"
+        if not os.path.exists(images_dir):
+            print(f"❌ Display images directory not found: {images_dir}")
+            return False
+        
+        # Check each required image
+        missing_images = []
+        for acc_value, image_file in DisplayConfig.IMAGE_MAPPING.items():
+            image_path = os.path.join(images_dir, image_file)
+            if os.path.exists(image_path):
+                print(f"   ✅ {image_file} found")
+            else:
+                print(f"   ❌ {image_file} missing")
+                missing_images.append(image_file)
+        
+        if missing_images:
+            print(f"❌ Missing images: {', '.join(missing_images)}")
+            return False
+        
         # Test display status
         status = manager.get_display_status()
         print(f"   Display status: {status}")
+        
+        # Test image loading and display
+        print("   Testing image display...")
+        try:
+            from PIL import Image, ImageTk
+            import tkinter as tk
+            
+            # Create a test window
+            root = tk.Tk()
+            root.title("Display Test")
+            root.geometry("800x600")
+            
+            # Test loading and displaying each image
+            for acc_value, image_file in DisplayConfig.IMAGE_MAPPING.items():
+                image_path = os.path.join(images_dir, image_file)
+                try:
+                    # Load and resize image
+                    image = Image.open(image_path)
+                    image = image.convert("RGB")
+                    image = image.resize((400, 300), Image.Resampling.LANCZOS)
+                    
+                    # Convert to PhotoImage
+                    photo = ImageTk.PhotoImage(image)
+                    
+                    # Display in window
+                    label = tk.Label(root, image=photo)
+                    label.image = photo  # Keep a reference
+                    label.pack()
+                    
+                    print(f"   ✅ {image_file} displayed successfully")
+                    
+                    # Update window
+                    root.update()
+                    time.sleep(0.5)  # Show each image briefly
+                    
+                    # Remove label for next image
+                    label.destroy()
+                    
+                except Exception as e:
+                    print(f"   ❌ Failed to display {image_file}: {e}")
+                    root.destroy()
+                    return False
+            
+            root.destroy()
+            print("   ✅ All images displayed successfully")
+            
+        except Exception as e:
+            print(f"   ❌ Image display test failed: {e}")
+            return False
         
         print("✅ Display test completed")
         return True
