@@ -163,7 +163,7 @@ Images are displayed directly from the `display/images/` directory.
 ```python
 class HardwareConfig:
     LED_COUNT = 60
-    LED_PIN = 18
+    LED_PIN = 5
     DETECT_OBJECT_SENSOR_PIN = 26
     BLUE_PROXIMITY_PIN = 19
     YELLOW_PROXIMITY_PIN = 13
