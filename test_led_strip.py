@@ -1,52 +1,26 @@
-#!/usr/bin/env python3
-"""
-Simple LED Strip Test - Standalone initialization
-"""
+from rpi_ws281x import PixelStrip, Color
 
-import RPi.GPIO as GPIO
-from rpi_ws281x import *
+# LED configuration:
+LED_COUNT = 30         # Number of LED pixels
+LED_PIN = 13           # GPIO 13
+LED_FREQ_HZ = 800000   # LED signal frequency
+LED_DMA = 10           # DMA channel
+LED_BRIGHTNESS = 255   # Max brightness
+LED_INVERT = False     # True if using NPN transistor level shift
+LED_CHANNEL = 1        # Channel 1 for GPIO 13
 
-# LED Configuration
-LED_COUNT = 60
-LED_PIN = 13
-LED_FREQ_HZ = 800000
-LED_DMA = 10
-LED_BRIGHTNESS = 125
-LED_INVERT = False
-LED_CHANNEL = 1
+def setup_leds():
+    strip = PixelStrip(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT,
+                       LED_BRIGHTNESS, LED_CHANNEL)
+    strip.begin()
+    return strip
 
-# Initialize LED strip directly
-print("🔧 Initializing LED strip...")
-strip = Adafruit_NeoPixel(
-    LED_COUNT,
-    LED_PIN,
-    LED_FREQ_HZ,
-    LED_DMA,
-    LED_INVERT,
-    LED_BRIGHTNESS,
-    LED_CHANNEL
-)
-strip.begin()
-print("✅ LED strip initialized successfully")
-
-# Turn on all LEDs to white
-print("💡 Turning on all LEDs...")
-for i in range(LED_COUNT):
-    strip.setPixelColor(i, Color(0, 0, 0))
-strip.show()
-for i in range(LED_COUNT):
-    strip.setPixelColor(i, Color(255, 0, 0))
-strip.show()
-print("✅ All LEDs are now ON")
-
-print("Press Ctrl+C to stop")
-try:
-    while True:
-        pass
-except KeyboardInterrupt:
-    print("\n🛑 Shutting down...")
-    # Turn off all LEDs
-    for i in range(LED_COUNT):
-        strip.setPixelColor(i, Color(0, 0, 0))
+def simple_test(strip):
+    for i in range(strip.numPixels()):
+        strip.setPixelColor(i, Color(255, 0, 0))  # Red
     strip.show()
-    print("✅ LEDs turned off") 
+
+# Example usage:
+if __name__ == '__main__':
+    strip = setup_leds()
+    simple_test(strip)
