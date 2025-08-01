@@ -20,7 +20,7 @@ class SimpleMediaDisplay:
         self.is_running = False
         self.timer_thread = None
         
-        # Current image path (no longer using /tmp)
+        # Current image path 
         self.current_image_path = None
         
         # Load image mapping
