@@ -5,7 +5,7 @@ LED_COUNT =  62         # Number of LED pixels
 LED_PIN = 18           # GPIO 13
 LED_FREQ_HZ = 800000   # LED signal frequency
 LED_DMA = 10           # DMA channel
-LED_BRIGHTNESS = 255   # Max brightness
+LED_BRIGHTNESS = 100   # Max brightness
 LED_INVERT = False     # True if using NPN transistor level shift
 LED_CHANNEL = 0        # Channel 1 for GPIO 13
 
@@ -17,7 +17,7 @@ def setup_leds():
 
 def simple_test(strip):
     for i in range(strip.numPixels()):
-        strip.setPixelColor(i, Color(255, 0, 0))  # Red
+        strip.setPixelColor(i, Color(0, 255, 0))  # Green
     strip.show()
     time.sleep(1)
 
