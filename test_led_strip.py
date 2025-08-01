@@ -8,12 +8,12 @@ from rpi_ws281x import *
 
 # LED Configuration
 LED_COUNT = 60
-LED_PIN = 18
+LED_PIN = 13
 LED_FREQ_HZ = 800000
 LED_DMA = 10
 LED_BRIGHTNESS = 125
 LED_INVERT = False
-LED_CHANNEL = 0
+LED_CHANNEL = 1
 
 # Initialize LED strip directly
 print("🔧 Initializing LED strip...")
@@ -32,7 +32,10 @@ print("✅ LED strip initialized successfully")
 # Turn on all LEDs to white
 print("💡 Turning on all LEDs...")
 for i in range(LED_COUNT):
-    strip.setPixelColor(i, Color(0, 0, 255))
+    strip.setPixelColor(i, Color(0, 0, 0))
+strip.show()
+for i in range(LED_COUNT):
+    strip.setPixelColor(i, Color(255, 0, 0))
 strip.show()
 print("✅ All LEDs are now ON")
 
