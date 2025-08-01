@@ -67,7 +67,7 @@ class LEDStripTester:
                 break
             print(f"   Testing {color_name}...")
             self.led_strip.set_color_all(color)
-            time.sleep(1)
+            time.sleep(5)
         
         print("✅ set_color_all() test completed")
     
@@ -114,6 +114,7 @@ class LEDStripTester:
         try:
             # Run only the tests for functions actually used
             self.test_set_color_all()
+            time.sleep(5)
             self.test_clear_all()
             self.test_success_animation()
             self.test_error_animation()
