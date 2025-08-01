@@ -162,8 +162,9 @@ class ClassificationManager:
             # Start processing animation
             self.led_strip.set_color_all((255, 255, 255))  # White for processing
         
-        # Perform classification
-        result = await self.classifier.classify(image)
+        # Perform classification (run in thread to avoid blocking)
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, self.classifier.classify, image)
         
         if self.led_strip:
             if result:
