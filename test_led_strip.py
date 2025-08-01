@@ -24,4 +24,8 @@ def simple_test(strip):
 # Example usage:
 if __name__ == '__main__':
     strip = setup_leds()
+    for i in range(strip.numPixels()):
+        strip.setPixelColor(i, Color(0, 0, 0))
+    strip.show()
+    time.sleep(1)
     simple_test(strip)
