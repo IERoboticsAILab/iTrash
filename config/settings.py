@@ -20,7 +20,7 @@ YOLO_API_KEY = os.getenv("YOLO_API_KEY")
 # Hardware Configuration
 class HardwareConfig:
     # LED Strip Configuration
-    LED_COUNT = 60
+    LED_COUNT = 2
     LED_PIN = 18
     LED_FREQ_HZ = 800000
     LED_DMA = 10
