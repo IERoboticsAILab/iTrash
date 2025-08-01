@@ -32,7 +32,7 @@ print("✅ LED strip initialized successfully")
 # Turn on all LEDs to white
 print("💡 Turning on all LEDs...")
 for i in range(LED_COUNT):
-    strip.setPixelColor(i, Color(255, 255, 255))
+    strip.setPixelColor(i, Color(0, 0, 255))
 strip.show()
 print("✅ All LEDs are now ON")
 
