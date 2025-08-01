@@ -123,6 +123,7 @@ class GPTClassifier:
                             print(f"GPT Classification: {trash_class}")
                             return trash_class
                         else:
+                            print(f"GPT Response: {content}")
                             print(f"Invalid color returned by GPT: {trash_class}")
                             continue
                             

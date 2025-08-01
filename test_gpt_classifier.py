@@ -40,7 +40,7 @@ def test_gpt_classifier():
     try:
         print("🔄 Sending image to GPT for classification...")
         result = classifier.classify(test_image)
-        
+        print(f"🎯 Result: {result}")
         if result:
             print(f"✅ Classification successful!")
             print(f"🎯 Result: {result}")
