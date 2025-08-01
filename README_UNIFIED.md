@@ -155,7 +155,7 @@ The display automatically updates based on system state:
 - **State 5** (`timeout`) → `timeout_new.png`
 - **State 6** (`error`) → `incorrect_new.png`
 
-Images are copied to `/tmp/itrash_current.png` for easy display.
+Images are displayed directly from the `display/images/` directory.
 
 ## 🔧 **Configuration**
 

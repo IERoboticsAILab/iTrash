@@ -20,8 +20,8 @@ class SimpleMediaDisplay:
         self.is_running = False
         self.timer_thread = None
         
-        # Standard location for current image
-        self.current_image_path = "/tmp/itrash_current.png"
+        # Current image path (no longer using /tmp)
+        self.current_image_path = None
         
         # Load image mapping
         self.image_mapping = DisplayConfig.IMAGE_MAPPING
@@ -43,12 +43,13 @@ class SimpleMediaDisplay:
             return False
         
         try:
-            # Copy image to standard location
-            shutil.copy2(source_path, self.current_image_path)
+            # Set current image path to the source image
+            self.current_image_path = source_path
             print(f"Displaying: {image_file} (State: {state_number})")
+            print(f"Image location: {source_path}")
             return True
         except Exception as e:
-            print(f"Error copying image: {e}")
+            print(f"Error setting image: {e}")
             return False
     
     def set_acc(self, value):
@@ -112,8 +113,8 @@ class SimpleMediaDisplay:
         self.timer_thread.start()
         
         print("Simple display system started")
-        print(f"Current image location: {self.current_image_path}")
-        print("Use any image viewer to display this file in fullscreen")
+        print("Images are now displayed directly from display/images/ directory")
+        print("Use any image viewer to display images from their original location")
     
     def stop(self):
         """Stop the display system"""
@@ -162,7 +163,10 @@ def show_state(state_number):
     """Utility function to manually show a specific state"""
     display = SimpleMediaDisplay()
     display.show_image(state_number)
-    print(f"Showing state {state_number}. Image available at: {display.current_image_path}")
+    if display.current_image_path:
+        print(f"Showing state {state_number}. Image available at: {display.current_image_path}")
+    else:
+        print(f"Showing state {state_number}. Image not found.")
 
 
 if __name__ == "__main__":
