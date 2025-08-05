@@ -146,6 +146,10 @@ class HardwareLoop:
             if bin_type == expected_bin:
                 # Correct bin!
                 state.update("reward", True)
+                
+                # Add delay before showing reward
+                time.sleep(TimingConfig.REWARD_DELAY)
+                
                 state.update("phase", "reward")
                 
                 # Show success animation
