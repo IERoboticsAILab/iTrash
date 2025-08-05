@@ -79,6 +79,9 @@ class HardwareLoop:
                 # Only check for object detection if we're in idle phase
                 # This prevents re-detection while processing or waiting for user confirmation
                 if current_phase == "idle" and proximity_sensors.detect_object_proximity():
+                    # Add delay before processing
+                    time.sleep(TimingConfig.IDLE_TO_PROCESSING_DELAY)
+                    
                     # Update state
                     state.update("phase", "processing")
                     state.update_sensor_status("object_detected", True)
@@ -152,7 +155,7 @@ class HardwareLoop:
                 # Auto-reset after delay
                 def auto_reset():
                     import time
-                    time.sleep(2)  # Show reward for 2 seconds
+                    time.sleep(TimingConfig.REWARD_DISPLAY_TIME)  # Show reward for configured time
                     state.update("phase", "idle")
                     state.update("reward", False)
                     state.update("last_classification", None)
@@ -180,7 +183,7 @@ class HardwareLoop:
                 # Auto-reset for incorrect bin
                 def auto_reset():
                     import time
-                    time.sleep(2)  # Show error for 2 seconds
+                    time.sleep(TimingConfig.INCORRECT_DISPLAY_TIME)  # Show error for configured time
                     state.update("phase", "idle")
                     state.update("reward", False)
                     
@@ -224,6 +227,9 @@ class HardwareLoop:
                     if result and result in ["blue", "yellow", "brown"]:
                         state.update("last_classification", result)
                         
+                        # Add delay before showing result
+                        time.sleep(TimingConfig.PROCESSING_TO_RESULT_DELAY)
+                        
                         # Show appropriate LED color and set specific phase
                         led_strip = self.hardware.get_led_strip() if self.hardware else None
                         if led_strip:
@@ -247,6 +253,18 @@ class HardwareLoop:
                             except:
                                 pass
                         
+                        # Add delay before returning to idle
+                        def error_delay():
+                            import time
+                            time.sleep(TimingConfig.RESULT_TO_IDLE_DELAY)
+                            state.update("phase", "idle")
+                            state.update("last_classification", None)
+                        
+                        # Start delay in separate thread
+                        import threading
+                        error_delay_thread = threading.Thread(target=error_delay, daemon=True)
+                        error_delay_thread.start()
+                        
                 except Exception as e:
                     state.update("phase", "error")
                     
@@ -256,6 +274,18 @@ class HardwareLoop:
                             self.hardware.get_led_strip().clear_all()
                         except:
                             pass
+                    
+                    # Add delay before returning to idle
+                    def exception_delay():
+                        import time
+                        time.sleep(TimingConfig.RESULT_TO_IDLE_DELAY)
+                        state.update("phase", "idle")
+                        state.update("last_classification", None)
+                    
+                    # Start delay in separate thread
+                    import threading
+                    exception_delay_thread = threading.Thread(target=exception_delay, daemon=True)
+                    exception_delay_thread.start()
                 finally:
                     loop.close()
             
@@ -276,6 +306,18 @@ class HardwareLoop:
                         self.hardware.get_led_strip().clear_all()
                     except:
                         pass
+                
+                # Add delay before returning to idle
+                def timeout_delay():
+                    import time
+                    time.sleep(TimingConfig.RESULT_TO_IDLE_DELAY)
+                    state.update("phase", "idle")
+                    state.update("last_classification", None)
+                
+                # Start delay in separate thread
+                import threading
+                timeout_delay_thread = threading.Thread(target=timeout_delay, daemon=True)
+                timeout_delay_thread.start()
             
         except Exception as e:
             state.update("phase", "error")
@@ -286,6 +328,18 @@ class HardwareLoop:
                     self.hardware.get_led_strip().clear_all()
                 except:
                     pass
+            
+            # Add delay before returning to idle
+            def detection_delay():
+                import time
+                time.sleep(TimingConfig.RESULT_TO_IDLE_DELAY)
+                state.update("phase", "idle")
+                state.update("last_classification", None)
+            
+            # Start delay in separate thread
+            import threading
+            detection_delay_thread = threading.Thread(target=detection_delay, daemon=True)
+            detection_delay_thread.start()
     
     def start(self):
         """Start the hardware loop"""
