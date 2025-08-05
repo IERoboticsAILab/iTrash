@@ -23,6 +23,9 @@ class SimpleMediaDisplay:
         self.screen_width = 1920
         self.screen_height = 1080
         self.image_mapping = DisplayConfig.IMAGE_MAPPING
+        self.display_initialized = False
+        self.last_error_time = 0
+        self.error_count = 0
         
         # Initialize display
         self._init_display()
@@ -34,6 +37,10 @@ class SimpleMediaDisplay:
             os.environ['SDL_VIDEODRIVER'] = 'x11'
             os.environ['DISPLAY'] = ':0'
             
+            # Additional environment variables to help with display issues
+            os.environ['SDL_VIDEO_X11_NODIRECTCOLOR'] = '1'
+            os.environ['SDL_VIDEO_X11_DGAMOUSE'] = '0'
+            
             pygame.init()
             
             # Get screen info and set fullscreen
@@ -41,14 +48,69 @@ class SimpleMediaDisplay:
             self.screen_width = info.current_w
             self.screen_height = info.current_h
             
-            self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.FULLSCREEN)
-            pygame.mouse.set_visible(False)
+            # Try different display modes if fullscreen fails
+            display_modes = [
+                ((self.screen_width, self.screen_height), pygame.FULLSCREEN),
+                ((1024, 768), pygame.FULLSCREEN),
+                ((800, 600), pygame.FULLSCREEN),
+                ((self.screen_width, self.screen_height), 0),  # Windowed mode
+                ((1024, 768), 0),
+            ]
             
-            print(f"✅ Display initialized: {self.screen_width}x{self.screen_height}")
+            for size, flags in display_modes:
+                try:
+                    self.screen = pygame.display.set_mode(size, flags)
+                    self.screen_width, self.screen_height = size
+                    break
+                except Exception as e:
+                    print(f"Display mode {size} with flags {flags} failed: {e}")
+                    continue
             
+            if self.screen:
+                pygame.mouse.set_visible(False)
+                self.display_initialized = True
+                print(f"✅ Display initialized: {self.screen_width}x{self.screen_height}")
+            else:
+                print("❌ All display modes failed")
+                self.display_initialized = False
+                
         except Exception as e:
             print(f"❌ Display init failed: {e}")
             self.screen = None
+            self.display_initialized = False
+    
+    def _recover_display(self):
+        """Try to recover display after an error"""
+        current_time = time.time()
+        
+        # Don't try to recover too frequently
+        if current_time - self.last_error_time < 5:
+            return False
+        
+        self.last_error_time = current_time
+        self.error_count += 1
+        
+        print(f"🔄 Attempting display recovery (attempt {self.error_count})")
+        
+        try:
+            # Clean up existing display
+            if self.screen:
+                pygame.display.quit()
+                self.screen = None
+            
+            # Reinitialize display
+            self._init_display()
+            
+            if self.display_initialized:
+                print("✅ Display recovery successful")
+                return True
+            else:
+                print("❌ Display recovery failed")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Display recovery error: {e}")
+            return False
     
     def show_image(self, state_number):
         """Show image for given state number"""
@@ -61,6 +123,7 @@ class SimpleMediaDisplay:
             image_path = Path(self.images_dir) / image_file
             
             if not image_path.exists():
+                print(f"❌ Image file not found: {image_path}")
                 return False
             
             # Load and scale image
@@ -84,16 +147,43 @@ class SimpleMediaDisplay:
             x = (self.screen_width - new_width) // 2
             y = (self.screen_height - new_height) // 2
             
-            # Display
-            self.screen.fill((0, 0, 0))
-            self.screen.blit(scaled_img, (x, y))
-            pygame.display.flip()
-            
-            print(f"✅ Displayed: {image_file}")
-            return True
+            # Display with error handling
+            try:
+                self.screen.fill((0, 0, 0))
+                self.screen.blit(scaled_img, (x, y))
+                pygame.display.flip()
+                
+                print(f"✅ Displayed: {image_file}")
+                return True
+                
+            except pygame.error as e:
+                if "GL context" in str(e) or "BadAccess" in str(e):
+                    print(f"🔄 GL context error, attempting recovery: {e}")
+                    if self._recover_display():
+                        # Retry once after recovery
+                        try:
+                            self.screen.fill((0, 0, 0))
+                            self.screen.blit(scaled_img, (x, y))
+                            pygame.display.flip()
+                            print(f"✅ Displayed after recovery: {image_file}")
+                            return True
+                        except Exception as retry_e:
+                            print(f"❌ Retry failed: {retry_e}")
+                            return False
+                    else:
+                        return False
+                else:
+                    raise e
             
         except Exception as e:
             print(f"❌ Display error: {e}")
+            
+            # Try to recover from certain types of errors
+            if "GL context" in str(e) or "BadAccess" in str(e):
+                if self._recover_display():
+                    # Retry the operation
+                    return self.show_image(state_number)
+            
             return False
     
     def set_acc(self, value):
@@ -134,7 +224,7 @@ class SimpleMediaDisplay:
     
     def start(self):
         """Start the display system"""
-        if not self.screen:
+        if not self.display_initialized:
             print("⚠️  No display, running in headless mode")
             self.is_running = True
             self.timer_thread = threading.Thread(target=self.monitor_state, daemon=True)
@@ -160,7 +250,10 @@ class SimpleMediaDisplay:
             self.timer_thread.join(timeout=1)
         
         if self.screen:
-            pygame.quit()
+            try:
+                pygame.quit()
+            except Exception as e:
+                print(f"Warning: Error during pygame cleanup: {e}")
         
         print("✅ Display stopped")
     
@@ -169,8 +262,9 @@ class SimpleMediaDisplay:
         return {
             "acc": self.acc,
             "is_running": self.is_running,
-            "has_display": self.screen is not None,
-            "screen": f"{self.screen_width}x{self.screen_height}"
+            "has_display": self.display_initialized,
+            "screen": f"{self.screen_width}x{self.screen_height}",
+            "error_count": self.error_count
         }
 
 
@@ -204,7 +298,7 @@ class DisplayManager:
 def show_state(state_number):
     """Show a specific state"""
     display = SimpleMediaDisplay()
-    if display.screen:
+    if display.display_initialized:
         display.show_image(state_number)
         time.sleep(3)
     display.stop()
