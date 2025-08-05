@@ -79,18 +79,21 @@ class SimpleMediaDisplay:
             self.screen = None
             self.display_initialized = False
     
-    def _recover_display(self):
-        """Try to recover display after an error"""
+    def _recover_display(self, force=False):
+        """Try to recover display after an error or force recovery"""
         current_time = time.time()
         
-        # Don't try to recover too frequently
-        if current_time - self.last_error_time < 5:
+        # Don't try to recover too frequently unless forced
+        if not force and current_time - self.last_error_time < 5:
             return False
         
         self.last_error_time = current_time
         self.error_count += 1
         
-        print(f"🔄 Attempting display recovery (attempt {self.error_count})")
+        if force:
+            print(f"🔄 Forcing display recovery (attempt {self.error_count})")
+        else:
+            print(f"🔄 Attempting display recovery (attempt {self.error_count})")
         
         try:
             # Clean up existing display
@@ -112,8 +115,21 @@ class SimpleMediaDisplay:
             print(f"❌ Display recovery error: {e}")
             return False
     
-    def show_image(self, state_number):
-        """Show image for given state number"""
+    def force_recovery(self):
+        """Force display recovery regardless of error state"""
+        return self._recover_display(force=True)
+    
+
+    
+    def show_image(self, state_number, force_recovery=False):
+        """Show image for given state number with optional force recovery"""
+        # Force recovery if requested
+        if force_recovery:
+            print("🔄 Force recovery requested before showing image")
+            if not self._recover_display(force=True):
+                print("❌ Force recovery failed")
+                return False
+        
         if not self.screen or state_number not in self.image_mapping:
             return False
         
@@ -273,6 +289,7 @@ class DisplayManager:
     
     def __init__(self):
         self.display = None
+        self.recovery_interval = 30  # seconds between automatic recovery checks
     
     def start_display(self, images_dir="display/images"):
         """Start display"""
@@ -292,6 +309,20 @@ class DisplayManager:
         if self.display:
             return self.display.get_status()
         return {"error": "No display"}
+    
+    def force_recovery(self):
+        """Force display recovery"""
+        if self.display:
+            return self.display.force_recovery()
+        return False
+    
+
+    
+    def show_image_with_recovery(self, state_number, force_recovery=False):
+        """Show image with optional forced recovery"""
+        if self.display:
+            return self.display.show_image(state_number, force_recovery=force_recovery)
+        return False
 
 
 # Simple test function
@@ -304,8 +335,37 @@ def show_state(state_number):
     display.stop()
 
 
+def test_force_recovery():
+    """Test the force recovery functionality"""
+    print("🔄 Testing Force Recovery Functionality")
+    
+    display = SimpleMediaDisplay()
+    if not display.display_initialized:
+        print("❌ Display not initialized, cannot test recovery")
+        return
+    
+    print("✅ Display initialized, testing force recovery...")
+    
+    # Test 1: Force recovery
+    print("\n1️⃣ Testing force recovery...")
+    success = display.force_recovery()
+    print(f"   Force recovery result: {'✅ Success' if success else '❌ Failed'}")
+    
+    # Test 2: Show image with force recovery
+    print("\n2️⃣ Testing show image with force recovery...")
+    success = display.show_image(0, force_recovery=True)
+    print(f"   Show with force recovery: {'✅ Success' if success else '❌ Failed'}")
+    
+    display.stop()
+    print("\n✅ Force recovery test completed")
+
+
 if __name__ == "__main__":
+    # Test force recovery functionality
+    test_force_recovery()
+    
     # Simple test
+    print("\n🖼️  Running simple display test...")
     display = SimpleMediaDisplay()
     display.start()
     
