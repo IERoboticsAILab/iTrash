@@ -13,10 +13,19 @@ from global_state import state
 from core.hardware import HardwareController
 from core.camera import CameraController
 from core.ai_classifier import ClassificationManager
-from config.settings import TimingConfig
+from config.settings import TimingConfig, Colors
 
 class HardwareLoop:
     """Background hardware loop manager"""
+    
+    # LED color constants
+    LED_COLORS = {
+        "processing": (255, 255, 255),  # White
+        "blue": (0, 0, 255),           # Blue
+        "yellow": (255, 255, 0),       # Yellow
+        "brown": (139, 69, 19),        # Brown
+        "error": (255, 0, 0)           # Red
+    }
     
     def __init__(self):
         self.is_running = False
@@ -27,6 +36,32 @@ class HardwareLoop:
         
         # Initialize components
         self._initialize_components()
+    
+    def _set_led_color(self, color_name: str):
+        """Set LED strip to specified color"""
+        if self.hardware:
+            try:
+                color = self.LED_COLORS.get(color_name, (0, 0, 0))
+                self.hardware.get_led_strip().set_color_all(color)
+            except Exception:
+                pass
+    
+    def _start_auto_reset(self, delay_seconds: int, clear_leds: bool = True):
+        """Start auto-reset timer to return to idle state"""
+        def auto_reset():
+            import time
+            time.sleep(delay_seconds)
+            state.update("phase", "idle")
+            state.update("last_classification", None)
+            if clear_leds and self.hardware:
+                try:
+                    self.hardware.get_led_strip().clear_all()
+                except:
+                    pass
+        
+        import threading
+        reset_thread = threading.Thread(target=auto_reset, daemon=True)
+        reset_thread.start()
     
     def _initialize_components(self):
         """Initialize hardware components"""
@@ -87,7 +122,7 @@ class HardwareLoop:
                     state.update_sensor_status("object_detected", True)
                     
                     # Show white LEDs for processing
-                    led_strip.set_color_all((255, 255, 255))
+                    self._set_led_color("processing")
                     
                     # Process the detection
                     self._process_trash_detection()
@@ -157,24 +192,7 @@ class HardwareLoop:
                     self.hardware.show_success_animation()
                 
                 # Auto-reset after delay
-                def auto_reset():
-                    import time
-                    time.sleep(TimingConfig.REWARD_DISPLAY_TIME)  # Show reward for configured time
-                    state.update("phase", "idle")
-                    state.update("reward", False)
-                    state.update("last_classification", None)
-                    
-                    # Clear LEDs
-                    if self.hardware:
-                        try:
-                            self.hardware.get_led_strip().clear_all()
-                        except:
-                            pass
-                
-                # Start auto-reset in separate thread
-                import threading
-                reset_thread = threading.Thread(target=auto_reset, daemon=True)
-                reset_thread.start()
+                self._start_auto_reset(TimingConfig.REWARD_DISPLAY_TIME)
                 
             else:
                 # Wrong bin
@@ -185,23 +203,7 @@ class HardwareLoop:
                     self.hardware.show_error_animation()
                 
                 # Auto-reset for incorrect bin
-                def auto_reset():
-                    import time
-                    time.sleep(TimingConfig.INCORRECT_DISPLAY_TIME)  # Show error for configured time
-                    state.update("phase", "idle")
-                    state.update("reward", False)
-                    
-                    # Clear LEDs
-                    if self.hardware:
-                        try:
-                            self.hardware.get_led_strip().clear_all()
-                        except:
-                            pass
-                
-                # Start auto-reset in separate thread
-                import threading
-                reset_thread = threading.Thread(target=auto_reset, daemon=True)
-                reset_thread.start()
+                self._start_auto_reset(TimingConfig.INCORRECT_DISPLAY_TIME)
     
     def _process_trash_detection(self):
         """Process trash detection and classification"""
@@ -238,58 +240,24 @@ class HardwareLoop:
                         led_strip = self.hardware.get_led_strip() if self.hardware else None
                         if led_strip:
                             if result == "blue":
-                                led_strip.set_color_all((0, 0, 255))
+                                self._set_led_color("blue")
                                 state.update("phase", "blue_trash")
                             elif result == "yellow":
-                                led_strip.set_color_all((255, 255, 0))
+                                self._set_led_color("yellow")
                                 state.update("phase", "yellow_trash")
                             elif result == "brown":
-                                led_strip.set_color_all((139, 69, 19))
+                                self._set_led_color("brown")
                                 state.update("phase", "brown_trash")
                     else:
                         # Classification failed or invalid result - show try_again_green
                         state.update("phase", "error")
-                        
-                        # Show red LEDs for error
-                        if self.hardware:
-                            try:
-                                self.hardware.get_led_strip().set_color_all((255, 0, 0))
-                            except:
-                                pass
-                        
-                        # Auto-reset after 5 seconds for failed classification
-                        def error_auto_reset():
-                            import time
-                            time.sleep(5)  # Show error for 5 seconds
-                            state.update("phase", "idle")
-                            state.update("last_classification", None)
-                        
-                        # Start auto-reset in separate thread
-                        import threading
-                        error_reset_thread = threading.Thread(target=error_auto_reset, daemon=True)
-                        error_reset_thread.start()
+                        self._set_led_color("error")
+                        self._start_auto_reset(5)
                         
                 except Exception as e:
                     state.update("phase", "error")
-                    
-                    # Show red LEDs for error
-                    if self.hardware:
-                        try:
-                            self.hardware.get_led_strip().set_color_all((255, 0, 0))
-                        except:
-                            pass
-                    
-                    # Auto-reset after 5 seconds for classification exception
-                    def exception_auto_reset():
-                        import time
-                        time.sleep(5)  # Show error for 5 seconds
-                        state.update("phase", "idle")
-                        state.update("last_classification", None)
-                    
-                    # Start auto-reset in separate thread
-                    import threading
-                    exception_reset_thread = threading.Thread(target=exception_auto_reset, daemon=True)
-                    exception_reset_thread.start()
+                    self._set_led_color("error")
+                    self._start_auto_reset(5)
                 finally:
                     loop.close()
             
@@ -303,23 +271,13 @@ class HardwareLoop:
             # If thread is still alive after timeout, show try_again_green
             if classify_thread.is_alive():
                 state.update("phase", "error")
-                
-                # Show red LEDs for timeout error
-                if self.hardware:
-                    try:
-                        self.hardware.get_led_strip().set_color_all((255, 0, 0))
-                    except:
-                        pass
+                self._set_led_color("error")
+                self._start_auto_reset(5)
             
         except Exception as e:
             state.update("phase", "error")
-            
-            # Show red LEDs for detection error
-            if self.hardware:
-                try:
-                    self.hardware.get_led_strip().set_color_all((255, 0, 0))
-                except:
-                    pass
+            self._set_led_color("error")
+            self._start_auto_reset(5)
     
     def start(self):
         """Start the hardware loop"""
