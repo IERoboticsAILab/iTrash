@@ -220,7 +220,12 @@ class SimpleMediaDisplay:
         """Set accumulator value and update display"""
         if value in self.image_mapping:
             self.acc = value
-            self.show_image(value)
+            if self.display_initialized:
+                self.show_image(value)
+            else:
+                # Log state change even without display
+                image_file = self.image_mapping.get(value, "unknown.png")
+                print(f"📝 State change (no display): {value} -> {image_file}")
         else:
             print(f"Invalid state: {value}")
     
@@ -271,8 +276,18 @@ class SimpleMediaDisplay:
     
     def start(self):
         """Start the display system"""
+        # Initialize display if not already initialized
         if not self.display_initialized:
-            print("❌ Display not initialized, cannot start")
+            self._initialize_display()
+        
+        if not self.display_initialized:
+            print("⚠️  Display not initialized, but continuing without display")
+            self.is_running = True
+            # Start monitoring thread even without display
+            self.timer_thread = threading.Thread(target=self.monitor_state)
+            self.timer_thread.daemon = True
+            self.timer_thread.start()
+            print("✅ Display system started (headless mode)")
             return
         
         self.is_running = True
