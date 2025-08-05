@@ -1,6 +1,6 @@
 """
-Global state singleton for iTrash unified system.
-Shared across hardware loop, API endpoints, and MQTT client.
+Simplified global state for iTrash core system.
+Shared between hardware loop and display manager.
 """
 
 from api.state import LocalState
