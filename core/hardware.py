@@ -4,8 +4,6 @@ Handles LED strip and proximity sensor operations.
 """
 
 import time
-import math
-import random
 import RPi.GPIO as GPIO
 from rpi_ws281x import *
 from config.settings import HardwareConfig, Colors
