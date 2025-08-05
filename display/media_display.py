@@ -30,9 +30,7 @@ class SimpleMediaDisplay:
         self.is_running = False
         self.timer_thread = None
         
-        # Pygame display components
-        self.screen = None
-        self.display_initialized = False
+        # Screen dimensions (will be set on first display)
         self.screen_width = 1920
         self.screen_height = 1080
         
@@ -43,15 +41,14 @@ class SimpleMediaDisplay:
         # Load image mapping
         self.image_mapping = DisplayConfig.IMAGE_MAPPING
         
-        # Initialize Pygame display
-        self._initialize_display()
+        # Pygame will be initialized fresh for each display
+        self.display_initialized = False
     
     def _initialize_display(self):
-        """Initialize Pygame display for fullscreen"""
+        """Initialize Pygame display for fullscreen - fresh for each display"""
         try:
             # Check if running on Raspberry Pi
             if is_raspberry_pi():
-                print("🍓 Raspberry Pi detected - using Pi-specific display setup")
                 # Set display environment for Raspberry Pi
                 os.environ['SDL_VIDEODRIVER'] = 'x11'
                 os.environ['DISPLAY'] = ':0'
@@ -59,17 +56,14 @@ class SimpleMediaDisplay:
                 # Additional Pi-specific settings
                 os.environ['SDL_AUDIODRIVER'] = 'alsa'
                 os.environ['SDL_VIDEO_X11_NODIRECTCOLOR'] = '1'
-            else:
-                print("💻 Non-Raspberry Pi system detected")
             
-            # Initialize Pygame
+            # Initialize Pygame fresh
             pygame.init()
             
             # Get screen info
             info = pygame.display.Info()
             self.screen_width = info.current_w
             self.screen_height = info.current_h
-            print(f"📐 Screen dimensions: {self.screen_width}x{self.screen_height}")
             
             # Set display mode to fullscreen
             self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.FULLSCREEN)
@@ -79,11 +73,23 @@ class SimpleMediaDisplay:
             pygame.mouse.set_visible(False)
             
             self.display_initialized = True
-            print("✅ Pygame fullscreen display initialized")
+            print(f"✅ Pygame display initialized: {self.screen_width}x{self.screen_height}")
             
         except Exception as e:
             print(f"❌ Failed to initialize Pygame display: {e}")
             self.display_initialized = False
+            self.screen = None
+    
+    def _close_display(self):
+        """Close Pygame display"""
+        try:
+            if self.screen:
+                pygame.display.quit()
+                self.screen = None
+            pygame.quit()
+            self.display_initialized = False
+        except Exception as e:
+            print(f"⚠️  Error closing display: {e}")
     
     def _load_and_scale_image(self, image_path):
         """Load and scale image to fit screen while maintaining aspect ratio"""
@@ -140,6 +146,9 @@ class SimpleMediaDisplay:
         except Exception as e:
             print(f"❌ Error displaying image: {e}")
             return False
+        finally:
+            # Always close Pygame after displaying
+            self._close_display()
     
     def show_image(self, state_number):
         """Show image for given state number in fullscreen"""
@@ -153,15 +162,21 @@ class SimpleMediaDisplay:
         if not source_path.exists():
             print(f"Image file not found: {source_path}")
             return False
-        
 
-        
         try:
+            # Initialize fresh Pygame display
+            self._initialize_display()
+            
+            if not self.display_initialized:
+                print(f"❌ Failed to initialize display for: {image_file}")
+                return False
+            
             # Load and scale image
             image_surface, position = self._load_and_scale_image(source_path)
             
             if image_surface is None:
                 print(f"Failed to load image: {image_file}")
+                self._close_display()
                 return False
             
             # Display image
@@ -171,14 +186,15 @@ class SimpleMediaDisplay:
                 # Update current image info
                 self.current_image_path = str(source_path)
                 self.current_image_surface = image_surface
-                print(f"✅ Displaying: {image_file} (State: {state_number})")
+                print(f"✅ Displayed: {image_file} (State: {state_number})")
                 return True
             else:
                 print(f"Failed to display image: {image_file}")
                 return False
                 
         except Exception as e:
-            print(f"Error showing image: {e}")
+            print(f"❌ Error in show_image: {e}")
+            self._close_display()
             return False
     
     def set_acc(self, value):
@@ -228,14 +244,7 @@ class SimpleMediaDisplay:
                     else:
                         phase_timer = None
                 
-                # Handle Pygame events (for exit)
-                if self.display_initialized:
-                    for event in pygame.event.get():
-                        if event.type == pygame.QUIT:
-                            self.is_running = False
-                        elif event.type == pygame.KEYDOWN:
-                            if event.key == pygame.K_ESCAPE:
-                                self.is_running = False
+
                         
             except Exception as e:
                 print(f"Error monitoring state: {e}")
@@ -268,13 +277,8 @@ class SimpleMediaDisplay:
         if self.timer_thread:
             self.timer_thread.join(timeout=1)
         
-        # Cleanup Pygame
-        if self.display_initialized:
-            try:
-                pygame.quit()
-                print("✅ Pygame display stopped")
-            except:
-                pass
+        # Cleanup any remaining Pygame
+        self._close_display()
         
         print("✅ Fullscreen display system stopped")
     
