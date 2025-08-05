@@ -247,18 +247,6 @@ class HardwareLoop:
                             except:
                                 pass
                         
-                        # Auto-reset after 5 seconds for failed classification
-                        def error_auto_reset():
-                            import time
-                            time.sleep(5)  # Show error for 5 seconds
-                            state.update("phase", "idle")
-                            state.update("last_classification", None)
-                        
-                        # Start auto-reset in separate thread
-                        import threading
-                        error_reset_thread = threading.Thread(target=error_auto_reset, daemon=True)
-                        error_reset_thread.start()
-                        
                 except Exception as e:
                     state.update("phase", "error")
                     
@@ -268,18 +256,6 @@ class HardwareLoop:
                             self.hardware.get_led_strip().clear_all()
                         except:
                             pass
-                    
-                    # Auto-reset after 5 seconds for classification exception
-                    def exception_auto_reset():
-                        import time
-                        time.sleep(5)  # Show error for 5 seconds
-                        state.update("phase", "idle")
-                        state.update("last_classification", None)
-                    
-                    # Start auto-reset in separate thread
-                    import threading
-                    exception_reset_thread = threading.Thread(target=exception_auto_reset, daemon=True)
-                    exception_reset_thread.start()
                 finally:
                     loop.close()
             
@@ -300,18 +276,6 @@ class HardwareLoop:
                         self.hardware.get_led_strip().clear_all()
                     except:
                         pass
-                
-                # Auto-reset after 5 seconds for classification timeout
-                def timeout_auto_reset():
-                    import time
-                    time.sleep(5)  # Show error for 5 seconds
-                    state.update("phase", "idle")
-                    state.update("last_classification", None)
-                
-                # Start auto-reset in separate thread
-                import threading
-                timeout_reset_thread = threading.Thread(target=timeout_auto_reset, daemon=True)
-                timeout_reset_thread.start()
             
         except Exception as e:
             state.update("phase", "error")
@@ -322,18 +286,6 @@ class HardwareLoop:
                     self.hardware.get_led_strip().clear_all()
                 except:
                     pass
-            
-            # Auto-reset after 5 seconds for trash detection exception
-            def detection_auto_reset():
-                import time
-                time.sleep(5)  # Show error for 5 seconds
-                state.update("phase", "idle")
-                state.update("last_classification", None)
-            
-            # Start auto-reset in separate thread
-            import threading
-            detection_reset_thread = threading.Thread(target=detection_auto_reset, daemon=True)
-            detection_reset_thread.start()
     
     def start(self):
         """Start the hardware loop"""
