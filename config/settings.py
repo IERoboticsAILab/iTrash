@@ -116,7 +116,7 @@ class TimingConfig:
     IDLE_TO_PROCESSING_DELAY = 1    # seconds - delay after object detection before processing
     PROCESSING_TO_RESULT_DELAY = 3  # seconds - delay after classification before showing result
     RESULT_TO_IDLE_DELAY = 1        # seconds - delay before returning to idle after error
-    REWARD_DELAY = 1                # seconds - delay before showing reward after correct bin
+    REWARD_DELAY = 3               # seconds - delay before showing reward after correct bin
     REWARD_DISPLAY_TIME = 5         # seconds - time to show reward message
     INCORRECT_DISPLAY_TIME = 2      # seconds - time to show incorrect message
 

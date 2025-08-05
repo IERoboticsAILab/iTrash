@@ -86,7 +86,7 @@ class HardwareLoop:
                     state.update("phase", "processing")
                     state.update_sensor_status("object_detected", True)
                     
-                    # Show white LEDs
+                    # Show white LEDs for processing
                     led_strip.set_color_all((255, 255, 255))
                     
                     # Process the detection
@@ -250,10 +250,10 @@ class HardwareLoop:
                         # Classification failed or invalid result - show try_again_green
                         state.update("phase", "error")
                         
-                        # Clear LEDs
+                        # Show red LEDs for error
                         if self.hardware:
                             try:
-                                self.hardware.get_led_strip().clear_all()
+                                self.hardware.get_led_strip().set_color_all((255, 0, 0))
                             except:
                                 pass
                         
@@ -272,10 +272,10 @@ class HardwareLoop:
                 except Exception as e:
                     state.update("phase", "error")
                     
-                    # Clear LEDs
+                    # Show red LEDs for error
                     if self.hardware:
                         try:
-                            self.hardware.get_led_strip().clear_all()
+                            self.hardware.get_led_strip().set_color_all((255, 0, 0))
                         except:
                             pass
                     
@@ -304,20 +304,20 @@ class HardwareLoop:
             if classify_thread.is_alive():
                 state.update("phase", "error")
                 
-                # Clear LEDs
+                # Show red LEDs for timeout error
                 if self.hardware:
                     try:
-                        self.hardware.get_led_strip().clear_all()
+                        self.hardware.get_led_strip().set_color_all((255, 0, 0))
                     except:
                         pass
             
         except Exception as e:
             state.update("phase", "error")
             
-            # Clear LEDs
+            # Show red LEDs for detection error
             if self.hardware:
                 try:
-                    self.hardware.get_led_strip().clear_all()
+                    self.hardware.get_led_strip().set_color_all((255, 0, 0))
                 except:
                     pass
     
