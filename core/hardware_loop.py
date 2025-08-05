@@ -13,7 +13,7 @@ from global_state import state
 from core.hardware import HardwareController
 from core.camera import CameraController
 from core.ai_classifier import ClassificationManager
-from config.settings import TimingConfig, Colors
+from config.settings import TimingConfig
 
 class HardwareLoop:
     """Background hardware loop manager"""

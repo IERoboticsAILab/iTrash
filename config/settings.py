@@ -134,9 +134,4 @@ class AIConfig:
     If there are no object, the value will be "", but if there is an object, you are forced to choose among one of the 3 colors.
     '''
 
-# Analytics Configuration
-class AnalyticsConfig:
-    DATA_EXPORT_PATH = "analytics/data/"
-    IMAGE_STORAGE_PATH = "analytics/images/"
-    CSV_FILENAME = "itrash_data.csv"
-    ANALYTICS_PORT = 8501 
+ 
