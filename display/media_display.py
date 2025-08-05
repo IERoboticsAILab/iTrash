@@ -71,7 +71,7 @@ class SimpleMediaDisplay:
                 self.display_initialized = True
             else:
                 self.display_initialized = False
-                
+            
         except Exception as e:
             self.screen = None
             self.display_initialized = False
@@ -220,7 +220,6 @@ class SimpleMediaDisplay:
                 new_state = phase_to_state.get(current_phase, 0)
                 
                 if new_state != self.acc:
-                    print(f"Display state change: {self.acc} -> {new_state} (phase: {current_phase})")
                     # Update LED color based on new phase before changing display
                     self._update_led_color(current_phase)
                     self.set_acc(new_state)

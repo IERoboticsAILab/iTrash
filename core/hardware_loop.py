@@ -100,22 +100,16 @@ class HardwareLoop:
                 
                 # Only check for object detection if we're in idle phase
                 # This prevents re-detection while processing or waiting for user confirmation
-                if current_phase == "idle":
-                    # Debug: Check if object is detected
-                    object_detected = proximity_sensors.detect_object_proximity()
-                    if object_detected:
-                        print(f"Object detected! Current phase: {current_phase}")
-                        
-                        # Add delay before processing
-                        time.sleep(TimingConfig.IDLE_TO_PROCESSING_DELAY)
-                        
-                        # Update state
-                        state.update("phase", "processing")
-                        state.update_sensor_status("object_detected", True)
-                        print(f"Phase updated to: processing")
-                        
-                        # Process the detection
-                        self._process_trash_detection()
+                if current_phase == "idle" and proximity_sensors.detect_object_proximity():
+                    # Add delay before processing
+                    time.sleep(TimingConfig.IDLE_TO_PROCESSING_DELAY)
+                    
+                    # Update state
+                    state.update("phase", "processing")
+                    state.update_sensor_status("object_detected", True)
+                    
+                    # Process the detection
+                    self._process_trash_detection()
                 
                 # Check bin sensors
                 self._check_bin_sensors(proximity_sensors)

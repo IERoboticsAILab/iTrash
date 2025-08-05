@@ -26,9 +26,6 @@ class LEDStrip:
     
     def set_color_all(self, color):
         """Set all LEDs to the same color"""
-        # Clear LEDs first to ensure clean transition
-        self.clear_all()
-        
         for i in range(HardwareConfig.LED_COUNT):
             self.strip.setPixelColor(i, Color(*color))
         self.strip.show()
@@ -42,7 +39,9 @@ class LEDStrip:
     
     def clear_all(self):
         """Turn off all LEDs"""
-        self.set_color_all(Colors.EMPTY)
+        for i in range(HardwareConfig.LED_COUNT):
+            self.strip.setPixelColor(i, Color(0, 0, 0))
+        self.strip.show()
     
 
 class ProximitySensors:
