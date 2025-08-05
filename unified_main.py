@@ -51,6 +51,9 @@ async def lifespan(app: FastAPI):
     try:
         hardware_loop = start_hardware_loop()
         print("Hardware loop started")
+        
+        # Small delay to ensure hardware is fully initialized
+        time.sleep(0.1)
     except Exception as e:
         print(f"Failed to start hardware loop: {e}")
     

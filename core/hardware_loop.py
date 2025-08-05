@@ -13,7 +13,7 @@ from global_state import state
 from core.hardware import HardwareController
 from core.camera import CameraController
 from core.ai_classifier import ClassificationManager
-from config.settings import TimingConfig
+from config.settings import TimingConfig, Colors
 
 class HardwareLoop:
     """Background hardware loop manager"""
@@ -103,7 +103,7 @@ class HardwareLoop:
                     state.update_sensor_status("object_detected", True)
                     
                     # Show white LEDs for processing
-                    self._set_led_color("processing")
+                    led_strip.set_color_all(Colors.WHITE)
                     
                     # Process the detection
                     self._process_trash_detection()

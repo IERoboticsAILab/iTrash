@@ -186,10 +186,6 @@ class SimpleMediaDisplay:
     
     def monitor_state(self):
         """Monitor state changes"""
-        # Ensure initial state is set
-        if self.acc == 0:
-            self.set_acc(SystemStates.IDLE)
-        
         while self.is_running:
             time.sleep(0.1)
             
@@ -225,26 +221,25 @@ class SimpleMediaDisplay:
     
     def start(self):
         """Start the display system"""
-        if not self.display_initialized:
-            self.is_running = True
-            self.timer_thread = threading.Thread(target=self.monitor_state, daemon=True)
-            self.timer_thread.start()
-            return
-        
         self.is_running = True
         
-        # Start monitoring first
+        # Clear LEDs first (before starting monitor)
+        self._clear_leds()
+        
+        # Start monitoring thread
         self.timer_thread = threading.Thread(target=self.monitor_state, daemon=True)
         self.timer_thread.start()
         
         # Small delay to ensure monitor is running
         time.sleep(0.1)
         
-        # Show initial image after monitor is active
-        self.show_image(SystemStates.IDLE)
-        
-        # Set initial LED color for idle state
-        self._update_led_color("idle")
+        # Show initial image only if display is initialized
+        if self.display_initialized:
+            self.show_image(SystemStates.IDLE)
+            # Set initial LED color for idle state
+            self._update_led_color("idle")
+            # Set acc to prevent monitor from triggering change
+            self.acc = SystemStates.IDLE
     
     def stop(self):
         """Stop the display system"""
@@ -258,6 +253,27 @@ class SimpleMediaDisplay:
                 pygame.quit()
             except Exception as e:
                 pass
+    
+    def _clear_leds(self):
+        """Clear all LEDs on startup"""
+        try:
+            # Import here to avoid circular imports
+            from core.hardware_loop import get_hardware_loop
+            
+            hardware_loop = get_hardware_loop()
+            if hardware_loop and hardware_loop.hardware:
+                led_strip = hardware_loop.hardware.get_led_strip()
+                if led_strip:
+                    led_strip.clear_all()
+                    print("✅ LEDs cleared on startup")
+                else:
+                    print("⚠️  LED strip not available during startup")
+            else:
+                print("⚠️  Hardware loop not available during startup")
+        except Exception as e:
+            print(f"⚠️  LED clearing failed during startup: {e}")
+            # Silently fail if LED control is not available
+            pass
     
     def _update_led_color(self, phase):
         """Update LED color based on current phase"""
@@ -285,7 +301,9 @@ class SimpleMediaDisplay:
                     
                     color = phase_colors.get(phase, (0, 0, 0))
                     led_strip.set_color_all(color)
+                    print(f"✅ LED color set to {color} for phase '{phase}'")
         except Exception as e:
+            print(f"⚠️  LED color update failed for phase '{phase}': {e}")
             # Silently fail if LED control is not available
             pass
     
