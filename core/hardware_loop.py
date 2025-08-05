@@ -49,33 +49,39 @@ class HardwareLoop:
         # Initialize hardware
         try:
             self.hardware = HardwareController()
+            print("✅ Hardware controller initialized successfully")
         except Exception as e:
-            print(f"Error initializing hardware: {e}")
+            print(f"❌ Error initializing hardware: {e}")
             self.hardware = None
         
         # Initialize camera
         try:
             self.camera = CameraController()
             if not self.camera.initialize():
-                print("Warning: Camera initialization failed")
+                print("⚠️  Warning: Camera initialization failed")
                 self.camera = None
+            else:
+                print("✅ Camera initialized successfully")
         except Exception as e:
-            print(f"Error initializing camera: {e}")
+            print(f"❌ Error initializing camera: {e}")
             self.camera = None
         
         # Initialize classifier
         try:
             led_strip = self.hardware.get_led_strip() if self.hardware else None
             self.classifier = ClassificationManager(led_strip)
+            print("✅ Classifier initialized successfully")
         except Exception as e:
-            print(f"Error initializing classifier: {e}")
+            print(f"❌ Error initializing classifier: {e}")
             self.classifier = None
     
     def _hardware_loop(self):
         """Main hardware loop"""
         if not self.hardware:
-            print("Hardware not available, exiting hardware loop")
+            print("❌ Hardware not available, exiting hardware loop")
             return
+        
+        print("🔄 Hardware loop started - monitoring for objects...")
         
         proximity_sensors = self.hardware.get_proximity_sensors()
         led_strip = self.hardware.get_led_strip()
@@ -94,18 +100,22 @@ class HardwareLoop:
                 
                 # Only check for object detection if we're in idle phase
                 # This prevents re-detection while processing or waiting for user confirmation
-                if current_phase == "idle" and proximity_sensors.detect_object_proximity():
-                    # Add delay before processing
-                    time.sleep(TimingConfig.IDLE_TO_PROCESSING_DELAY)
-                    
-                    # Update state
-                    state.update("phase", "processing")
-                    state.update_sensor_status("object_detected", True)
-                    
-
-                    
-                    # Process the detection
-                    self._process_trash_detection()
+                if current_phase == "idle":
+                    # Debug: Check if object is detected
+                    object_detected = proximity_sensors.detect_object_proximity()
+                    if object_detected:
+                        print(f"Object detected! Current phase: {current_phase}")
+                        
+                        # Add delay before processing
+                        time.sleep(TimingConfig.IDLE_TO_PROCESSING_DELAY)
+                        
+                        # Update state
+                        state.update("phase", "processing")
+                        state.update_sensor_status("object_detected", True)
+                        print(f"Phase updated to: processing")
+                        
+                        # Process the detection
+                        self._process_trash_detection()
                 
                 # Check bin sensors
                 self._check_bin_sensors(proximity_sensors)
