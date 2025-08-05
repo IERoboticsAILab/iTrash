@@ -106,7 +106,7 @@ class DisplayConfig:
 
 # Timing Configuration
 class TimingConfig:
-    OBJECT_DETECTION_DELAY = 4      # seconds - delay before object detection starts
+    OBJECT_DETECTION_DELAY = 1      # seconds - delay before object detection starts
     PROCESSING_TIMEOUT = 10         # seconds - timeout for classification
     USER_CONFIRMATION_TIMEOUT = 30  # seconds - timeout for user action
     LED_BLINK_INTERVAL = 0.5        # seconds - LED blinking interval

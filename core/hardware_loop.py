@@ -87,7 +87,9 @@ class HardwareLoop:
                     state.update_sensor_status("object_detected", True)
                     
                     # Show white LEDs
-                    led_strip.set_color_all((255, 255, 255))
+                    if led_strip:
+                        led_strip.set_color_all((255, 255, 255))
+                        print("LED: Set white (processing)")
                     
                     # Process the detection
                     self._process_trash_detection()
@@ -235,12 +237,15 @@ class HardwareLoop:
                         if led_strip:
                             if result == "blue":
                                 led_strip.set_color_all((0, 0, 255))
+                                print("LED: Set blue")
                                 state.update("phase", "blue_trash")
                             elif result == "yellow":
                                 led_strip.set_color_all((255, 255, 0))
+                                print("LED: Set yellow")
                                 state.update("phase", "yellow_trash")
                             elif result == "brown":
                                 led_strip.set_color_all((139, 69, 19))
+                                print("LED: Set brown")
                                 state.update("phase", "brown_trash")
                     else:
                         # Classification failed or invalid result - show try_again_green
