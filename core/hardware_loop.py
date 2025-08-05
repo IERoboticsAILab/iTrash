@@ -30,12 +30,9 @@ class HardwareLoop:
     
     def _initialize_components(self):
         """Initialize hardware components"""
-        print("Initializing hardware components...")
-        
         # Initialize hardware
         try:
             self.hardware = HardwareController()
-            print("Hardware initialized successfully")
         except Exception as e:
             print(f"Error initializing hardware: {e}")
             self.hardware = None
@@ -43,9 +40,7 @@ class HardwareLoop:
         # Initialize camera
         try:
             self.camera = CameraController()
-            if self.camera.initialize():
-                print("Camera initialized successfully")
-            else:
+            if not self.camera.initialize():
                 print("Warning: Camera initialization failed")
                 self.camera = None
         except Exception as e:
@@ -56,7 +51,6 @@ class HardwareLoop:
         try:
             led_strip = self.hardware.get_led_strip() if self.hardware else None
             self.classifier = ClassificationManager(led_strip)
-            print("AI classifier initialized successfully")
         except Exception as e:
             print(f"Error initializing classifier: {e}")
             self.classifier = None
@@ -69,8 +63,6 @@ class HardwareLoop:
         
         proximity_sensors = self.hardware.get_proximity_sensors()
         led_strip = self.hardware.get_led_strip()
-        
-        print("Hardware loop started - monitoring sensors...")
         
         # Initial delay
         time.sleep(TimingConfig.OBJECT_DETECTION_DELAY)
@@ -87,8 +79,6 @@ class HardwareLoop:
                 # Only check for object detection if we're in idle phase
                 # This prevents re-detection while processing or waiting for user confirmation
                 if current_phase == "idle" and proximity_sensors.detect_object_proximity():
-                    print("Object detected in hardware loop!")
-                    
                     # Update state
                     state.update("phase", "processing")
                     state.update_sensor_status("object_detected", True)
@@ -154,7 +144,6 @@ class HardwareLoop:
                 # Correct bin!
                 state.update("reward", True)
                 state.update("phase", "reward")
-                print(f"Correct bin detected: {bin_type}")
                 
                 # Show success animation
                 if self.hardware:
@@ -183,7 +172,6 @@ class HardwareLoop:
             else:
                 # Wrong bin
                 state.update("phase", "incorrect")
-                print(f"Incorrect bin detected: {bin_type}, expected: {expected_bin}")
                 
                 # Show error animation
                 if self.hardware:
@@ -233,10 +221,8 @@ class HardwareLoop:
                     result = loop.run_until_complete(
                         self.classifier.process_image_with_feedback(frame)
                     )
-                    print(f"Classification result: {result}----------------")
                     if result and result in ["blue", "yellow", "brown"]:
                         state.update("last_classification", result)
-                        print(f"Classification result: {result}")
                         
                         # Show appropriate LED color and set specific phase
                         led_strip = self.hardware.get_led_strip() if self.hardware else None
@@ -253,7 +239,6 @@ class HardwareLoop:
                     else:
                         # Classification failed or invalid result - show try_again_green
                         state.update("phase", "error")
-                        print(f"Classification failed or invalid result: {result}")
                         
                         # Clear LEDs
                         if self.hardware:
@@ -263,7 +248,6 @@ class HardwareLoop:
                                 pass
                         
                 except Exception as e:
-                    print(f"Error in classification: {e}")
                     state.update("phase", "error")
                     
                     # Clear LEDs
@@ -284,7 +268,6 @@ class HardwareLoop:
             
             # If thread is still alive after timeout, show try_again_green
             if classify_thread.is_alive():
-                print("Classification timeout - showing try again")
                 state.update("phase", "error")
                 
                 # Clear LEDs
@@ -295,7 +278,6 @@ class HardwareLoop:
                         pass
             
         except Exception as e:
-            print(f"Error in trash detection: {e}")
             state.update("phase", "error")
             
             # Clear LEDs
@@ -308,13 +290,11 @@ class HardwareLoop:
     def start(self):
         """Start the hardware loop"""
         if self.is_running:
-            print("Hardware loop already running")
             return
         
         self.is_running = True
         self.thread = threading.Thread(target=self._hardware_loop, daemon=True)
         self.thread.start()
-        print("Hardware loop started")
     
     def stop(self):
         """Stop the hardware loop"""
@@ -340,8 +320,6 @@ class HardwareLoop:
                 self.camera.release()
             except:
                 pass
-        
-        print("Hardware loop stopped")
 
 # Global hardware loop instance
 hardware_loop: Optional[HardwareLoop] = None
