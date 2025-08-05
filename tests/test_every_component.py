@@ -507,28 +507,42 @@ def test_performance_and_stability():
         print(f"❌ Performance and stability test failed: {e}")
         return False
 
-def main():
-    """Main comprehensive test function"""
-    print("🔍 Comprehensive iTrash System Test - EVERY COMPONENT")
+def print_test_menu():
+    """Print the interactive test menu"""
+    print("\n" + "=" * 70)
+    print("🎯 iTrash Component Test Selector")
     print("=" * 70)
-    print("🎯 Testing every single component, state, transition, and scenario")
+    print("Choose which components to test:")
+    print("  1  - All System States (12 states + image mapping)")
+    print("  2  - All Phase Transitions (20+ transitions)")
+    print("  3  - All Sensor States (16 sensor combinations)")
+    print("  4  - All Display Images (12 images + fullscreen)")
+    print("  5  - All Hardware Components (hardware integration)")
+    print("  6  - All API Endpoints (9 API endpoints)")
+    print("  7  - All Error Scenarios (error handling)")
+    print("  8  - Complete User Journey (full simulation)")
+    print("  9  - Performance and Stability (stress testing)")
+    print("  10 - All Tests (run everything)")
+    print("  0  - Exit")
     print("=" * 70)
-    
-    comprehensive_tests = [
-        ("All System States", test_all_system_states),
-        ("All Phase Transitions", test_all_phase_transitions),
-        ("All Sensor States", test_all_sensor_states),
-        ("All Display Images", test_all_display_images),
-        ("All Hardware Components", test_all_hardware_components),
-        ("All API Endpoints", test_all_api_endpoints),
-        ("All Error Scenarios", test_all_error_scenarios),
-        ("Complete User Journey", test_complete_user_journey),
-        ("Performance and Stability", test_performance_and_stability)
-    ]
+
+def get_user_selection():
+    """Get user selection for tests"""
+    try:
+        choice = input("\n🎯 Enter your choice (0-10): ").strip()
+        return choice
+    except KeyboardInterrupt:
+        print("\n👋 Test interrupted")
+        return "0"
+
+def run_selected_tests(selected_tests):
+    """Run the selected tests"""
+    print(f"\n🚀 Running {len(selected_tests)} selected test(s)...")
+    print("=" * 70)
     
     results = {}
     
-    for test_name, test_func in comprehensive_tests:
+    for test_name, test_func in selected_tests:
         print(f"\n{'='*25} {test_name} {'='*25}")
         try:
             results[test_name] = test_func()
@@ -536,9 +550,9 @@ def main():
             print(f"❌ {test_name} failed with exception: {e}")
             results[test_name] = False
     
-    # Comprehensive summary
+    # Summary
     print(f"\n{'='*70}")
-    print("📋 COMPREHENSIVE TEST RESULTS SUMMARY:")
+    print("📋 SELECTED TEST RESULTS SUMMARY:")
     print("=" * 70)
     
     passed = 0
@@ -550,33 +564,114 @@ def main():
         if success:
             passed += 1
     
-    print(f"\n🎯 Overall Results: {passed}/{total} comprehensive tests passed")
+    print(f"\n🎯 Results: {passed}/{total} selected tests passed")
     
     if passed == total:
-        print("\n🎉 ALL COMPREHENSIVE TESTS PASSED!")
-        print("💡 Every component of your iTrash system is working perfectly!")
-        print("🚀 Your system is 100% ready for production use!")
+        print("\n🎉 ALL SELECTED TESTS PASSED!")
     elif passed >= total * 0.8:
-        print("\n✅ Most comprehensive tests passed!")
-        print("💡 Your system is mostly ready with minor issues.")
-        print("🔧 Check the failed tests above for specific issues.")
+        print("\n✅ Most selected tests passed!")
     else:
-        print("\n⚠️  Several comprehensive tests failed.")
-        print("💡 Your system needs attention before production use.")
-        print("🔧 Review the failed tests above for required fixes.")
+        print("\n⚠️  Several selected tests failed.")
     
-    print(f"\n📊 Test Coverage:")
-    print(f"   • All 12 system states tested")
-    print(f"   • All phase transitions tested")
-    print(f"   • All sensor combinations tested")
-    print(f"   • All display images tested")
-    print(f"   • All hardware components tested")
-    print(f"   • All API endpoints tested")
-    print(f"   • All error scenarios tested")
-    print(f"   • Complete user journey tested")
-    print(f"   • Performance and stability tested")
+    return results
+
+def main():
+    """Main interactive test function"""
+    print("🔍 Interactive iTrash System Test")
+    print("=" * 70)
+    print("🎯 Choose which components to test")
+    print("=" * 70)
     
-    print("\n🚀 Your iTrash system has been thoroughly tested!")
+    # Define all available tests
+    all_tests = [
+        ("All System States", test_all_system_states),
+        ("All Phase Transitions", test_all_phase_transitions),
+        ("All Sensor States", test_all_sensor_states),
+        ("All Display Images", test_all_display_images),
+        ("All Hardware Components", test_all_hardware_components),
+        ("All API Endpoints", test_all_api_endpoints),
+        ("All Error Scenarios", test_all_error_scenarios),
+        ("Complete User Journey", test_complete_user_journey),
+        ("Performance and Stability", test_performance_and_stability)
+    ]
+    
+    while True:
+        print_test_menu()
+        choice = get_user_selection()
+        
+        if choice == "0":
+            print("👋 Goodbye!")
+            break
+        
+        elif choice == "10":
+            # Run all tests
+            print("\n🎯 Running ALL tests...")
+            run_selected_tests(all_tests)
+            break
+        
+        elif choice.isdigit() and 1 <= int(choice) <= 9:
+            # Run specific test
+            test_index = int(choice) - 1
+            selected_test = [all_tests[test_index]]
+            run_selected_tests(selected_test)
+            
+            # Ask if user wants to run more tests
+            try:
+                continue_choice = input("\n🔄 Run another test? (y/n): ").strip().lower()
+                if continue_choice not in ['y', 'yes']:
+                    print("👋 Goodbye!")
+                    break
+            except KeyboardInterrupt:
+                print("\n👋 Goodbye!")
+                break
+        
+        else:
+            print("❌ Invalid choice. Please enter a number between 0-10.")
+    
+    print("\n🚀 Test session completed!")
+
+def run_quick_test():
+    """Run a quick test of core functionality"""
+    print("⚡ Quick Test - Core Functionality")
+    print("=" * 50)
+    
+    # Run the most important tests that don't require external dependencies
+    quick_tests = [
+        ("All Phase Transitions", test_all_phase_transitions),
+        ("All Sensor States", test_all_sensor_states),
+    ]
+    
+    results = run_selected_tests(quick_tests)
+    
+    passed = sum(1 for success in results.values() if success)
+    total = len(results)
+    
+    if passed == total:
+        print("\n🎉 Quick test passed! Core system is working.")
+    else:
+        print("\n⚠️  Quick test failed. Check the issues above.")
+    
+    return results
 
 if __name__ == "__main__":
-    main() 
+    import sys
+    
+    # Check for command line arguments
+    if len(sys.argv) > 1:
+        arg = sys.argv[1].lower()
+        
+        if arg in ['quick', 'q', '-q', '--quick']:
+            # Run quick test
+            run_quick_test()
+        elif arg in ['help', 'h', '-h', '--help']:
+            print("🔍 iTrash Component Test Usage:")
+            print("=" * 50)
+            print("python tests/test_every_component.py          # Interactive menu")
+            print("python tests/test_every_component.py quick    # Quick core test")
+            print("python tests/test_every_component.py help     # Show this help")
+        else:
+            print(f"❌ Unknown argument: {arg}")
+            print("💡 Use 'help' to see available options")
+    else:
+        # Run interactive menu
+        main() 
