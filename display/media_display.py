@@ -216,6 +216,8 @@ class SimpleMediaDisplay:
                 new_state = phase_to_state.get(current_phase, 0)
                 
                 if new_state != self.acc:
+                    # Update LED color based on new phase before changing display
+                    self._update_led_color(current_phase)
                     self.set_acc(new_state)
                     
             except Exception as e:
@@ -240,6 +242,9 @@ class SimpleMediaDisplay:
         
         # Show initial image after monitor is active
         self.show_image(SystemStates.IDLE)
+        
+        # Set initial LED color for idle state
+        self._update_led_color("idle")
     
     def stop(self):
         """Stop the display system"""
@@ -253,6 +258,36 @@ class SimpleMediaDisplay:
                 pygame.quit()
             except Exception as e:
                 pass
+    
+    def _update_led_color(self, phase):
+        """Update LED color based on current phase"""
+        try:
+            # Import here to avoid circular imports
+            from core.hardware_loop import get_hardware_loop
+            
+            hardware_loop = get_hardware_loop()
+            if hardware_loop and hardware_loop.hardware:
+                led_strip = hardware_loop.hardware.get_led_strip()
+                if led_strip:
+                    # Map phases to LED colors
+                    phase_colors = {
+                        "idle": (0, 0, 0),           # Off
+                        "processing": (255, 255, 255), # White
+                        "blue_trash": (0, 0, 255),     # Blue
+                        "yellow_trash": (255, 255, 0), # Yellow
+                        "brown_trash": (139, 69, 19),  # Brown
+                        "error": (255, 0, 0),          # Red
+                        "success": (0, 255, 0),        # Green
+                        "reward": (0, 255, 0),         # Green
+                        "incorrect": (255, 0, 0),      # Red
+                        "timeout": (255, 0, 0)         # Red
+                    }
+                    
+                    color = phase_colors.get(phase, (0, 0, 0))
+                    led_strip.set_color_all(color)
+        except Exception as e:
+            # Silently fail if LED control is not available
+            pass
     
     def get_status(self):
         """Get status"""

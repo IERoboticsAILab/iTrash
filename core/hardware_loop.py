@@ -18,14 +18,7 @@ from config.settings import TimingConfig
 class HardwareLoop:
     """Background hardware loop manager"""
     
-    # LED color constants
-    LED_COLORS = {
-        "processing": (255, 255, 255),  # White
-        "blue": (0, 0, 255),           # Blue
-        "yellow": (255, 255, 0),       # Yellow
-        "brown": (139, 69, 19),        # Brown
-        "error": (255, 0, 0)           # Red
-    }
+
     
     def __init__(self):
         self.is_running = False
@@ -37,27 +30,15 @@ class HardwareLoop:
         # Initialize components
         self._initialize_components()
     
-    def _set_led_color(self, color_name: str):
-        """Set LED strip to specified color"""
-        if self.hardware:
-            try:
-                color = self.LED_COLORS.get(color_name, (0, 0, 0))
-                self.hardware.get_led_strip().set_color_all(color)
-            except Exception:
-                pass
+
     
-    def _start_auto_reset(self, delay_seconds: int, clear_leds: bool = True):
+    def _start_auto_reset(self, delay_seconds: int):
         """Start auto-reset timer to return to idle state"""
         def auto_reset():
             import time
             time.sleep(delay_seconds)
             state.update("phase", "idle")
             state.update("last_classification", None)
-            if clear_leds and self.hardware:
-                try:
-                    self.hardware.get_led_strip().clear_all()
-                except:
-                    pass
         
         import threading
         reset_thread = threading.Thread(target=auto_reset, daemon=True)
@@ -236,27 +217,20 @@ class HardwareLoop:
                         # Add delay before showing result
                         time.sleep(TimingConfig.PROCESSING_TO_RESULT_DELAY)
                         
-                        # Show appropriate LED color and set specific phase
-                        led_strip = self.hardware.get_led_strip() if self.hardware else None
-                        if led_strip:
-                            if result == "blue":
-                                self._set_led_color("blue")
-                                state.update("phase", "blue_trash")
-                            elif result == "yellow":
-                                self._set_led_color("yellow")
-                                state.update("phase", "yellow_trash")
-                            elif result == "brown":
-                                self._set_led_color("brown")
-                                state.update("phase", "brown_trash")
+                        # Set specific phase (LED will change in display manager)
+                        if result == "blue":
+                            state.update("phase", "blue_trash")
+                        elif result == "yellow":
+                            state.update("phase", "yellow_trash")
+                        elif result == "brown":
+                            state.update("phase", "brown_trash")
                     else:
                         # Classification failed or invalid result - show try_again_green
                         state.update("phase", "error")
-                        self._set_led_color("error")
                         self._start_auto_reset(5)
                         
                 except Exception as e:
                     state.update("phase", "error")
-                    self._set_led_color("error")
                     self._start_auto_reset(5)
                 finally:
                     loop.close()
@@ -271,12 +245,10 @@ class HardwareLoop:
             # If thread is still alive after timeout, show try_again_green
             if classify_thread.is_alive():
                 state.update("phase", "error")
-                self._set_led_color("error")
                 self._start_auto_reset(5)
             
         except Exception as e:
             state.update("phase", "error")
-            self._set_led_color("error")
             self._start_auto_reset(5)
     
     def start(self):
