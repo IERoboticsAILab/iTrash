@@ -7,6 +7,9 @@ import os
 import sys
 from pathlib import Path
 
+# Add the project root to the Python path
+sys.path.append(str(Path(__file__).parent.parent))
+
 def test_pil_fullscreen():
     """Test PIL with fullscreen display"""
     print("🖼️  Testing PIL Fullscreen Display")

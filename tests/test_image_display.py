@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 
 # Add the project root to the Python path
-sys.path.append(str(Path(__file__).parent))
+sys.path.append(str(Path(__file__).parent.parent))
 
 from display.media_display import SimpleMediaDisplay, DisplayManager
 from config.settings import SystemStates, DisplayConfig

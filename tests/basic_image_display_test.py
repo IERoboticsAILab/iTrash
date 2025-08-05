@@ -7,6 +7,9 @@ import os
 import sys
 from pathlib import Path
 
+# Add the project root to the Python path
+sys.path.append(str(Path(__file__).parent.parent))
+
 def test_basic_image_access():
     """Test basic image file access"""
     print("🔍 Testing Basic Image Access")

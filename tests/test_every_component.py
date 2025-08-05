@@ -10,7 +10,7 @@ import threading
 from pathlib import Path
 
 # Add the project root to the Python path
-sys.path.append(str(Path(__file__).parent))
+sys.path.append(str(Path(__file__).parent.parent))
 
 def test_all_system_states():
     """Test all 12 system states"""
