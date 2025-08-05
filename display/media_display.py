@@ -222,11 +222,14 @@ class SimpleMediaDisplay:
                     "processing": SystemStates.PROCESSING,
                     "show_trash": SystemStates.SHOW_TRASH,
                     "user_confirmation": SystemStates.USER_CONFIRMATION,
+                    "blue_trash": SystemStates.THROW_BLUE,
+                    "yellow_trash": SystemStates.THROW_YELLOW,
+                    "brown_trash": SystemStates.THROW_BROWN,
                     "success": SystemStates.SUCCESS,
                     "reward": SystemStates.REWARD,
                     "incorrect": SystemStates.INCORRECT,
                     "timeout": SystemStates.TIMEOUT,
-                    "error": SystemStates.IDLE,
+                    "error": SystemStates.USER_CONFIRMATION,  # Show try_again_green.png on error
                     "qr_codes": SystemStates.QR_CODES
                 }
                 

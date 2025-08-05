@@ -137,9 +137,20 @@ class HardwareLoop:
         current_phase = state.get("phase")
         last_classification = state.get("last_classification")
         
-        # Only process if we're in user confirmation phase
-        if current_phase == "user_confirmation":
-            if last_classification == bin_type:
+        # Check if we're in one of the trash-specific phases
+        trash_phases = ["blue_trash", "yellow_trash", "brown_trash"]
+        
+        if current_phase in trash_phases:
+            # Map phase to expected bin type
+            phase_to_bin = {
+                "blue_trash": "blue",
+                "yellow_trash": "yellow", 
+                "brown_trash": "brown"
+            }
+            
+            expected_bin = phase_to_bin.get(current_phase)
+            
+            if bin_type == expected_bin:
                 # Correct bin!
                 state.update("reward", True)
                 state.update("phase", "reward")
@@ -172,7 +183,7 @@ class HardwareLoop:
             else:
                 # Wrong bin
                 state.update("phase", "incorrect")
-                print(f"Incorrect bin detected: {bin_type}, expected: {last_classification}")
+                print(f"Incorrect bin detected: {bin_type}, expected: {expected_bin}")
                 
                 # Show error animation
                 if self.hardware:
@@ -222,28 +233,45 @@ class HardwareLoop:
                     result = loop.run_until_complete(
                         self.classifier.process_image_with_feedback(frame)
                     )
-                    
-                    if result:
+                    print(f"Classification result: {result}----------------")
+                    if result and result in ["blue", "yellow", "brown"]:
                         state.update("last_classification", result)
-                        state.update("phase", "user_confirmation")
                         print(f"Classification result: {result}")
                         
-                        # Show appropriate LED color
+                        # Show appropriate LED color and set specific phase
                         led_strip = self.hardware.get_led_strip() if self.hardware else None
                         if led_strip:
                             if result == "blue":
                                 led_strip.set_color_all((0, 0, 255))
+                                state.update("phase", "blue_trash")
                             elif result == "yellow":
                                 led_strip.set_color_all((255, 255, 0))
+                                state.update("phase", "yellow_trash")
                             elif result == "brown":
                                 led_strip.set_color_all((139, 69, 19))
+                                state.update("phase", "brown_trash")
                     else:
+                        # Classification failed or invalid result - show try_again_green
                         state.update("phase", "error")
-                        print("Classification failed")
+                        print(f"Classification failed or invalid result: {result}")
+                        
+                        # Clear LEDs
+                        if self.hardware:
+                            try:
+                                self.hardware.get_led_strip().clear_all()
+                            except:
+                                pass
                         
                 except Exception as e:
                     print(f"Error in classification: {e}")
                     state.update("phase", "error")
+                    
+                    # Clear LEDs
+                    if self.hardware:
+                        try:
+                            self.hardware.get_led_strip().clear_all()
+                        except:
+                            pass
                 finally:
                     loop.close()
             
@@ -254,10 +282,10 @@ class HardwareLoop:
             # Set a timeout for classification (30 seconds)
             classify_thread.join(timeout=30)
             
-            # If thread is still alive after timeout, force reset to idle
+            # If thread is still alive after timeout, show try_again_green
             if classify_thread.is_alive():
-                print("Classification timeout - resetting to idle")
-                state.update("phase", "idle")
+                print("Classification timeout - showing try again")
+                state.update("phase", "error")
                 
                 # Clear LEDs
                 if self.hardware:
@@ -269,6 +297,13 @@ class HardwareLoop:
         except Exception as e:
             print(f"Error in trash detection: {e}")
             state.update("phase", "error")
+            
+            # Clear LEDs
+            if self.hardware:
+                try:
+                    self.hardware.get_led_strip().clear_all()
+                except:
+                    pass
     
     def start(self):
         """Start the hardware loop"""
