@@ -31,6 +31,13 @@ class LEDStrip:
         for i in range(HardwareConfig.LED_COUNT):
             self.strip.setPixelColor(i, Color(*color))
         self.strip.show()
+
+    def flash(self, color, wait_ms=100):
+        """Flash the LED strip with the given color"""
+        self.set_color_all(color)
+        time.sleep(wait_ms / 1000)
+        self.clear_all()
+        time.sleep(wait_ms / 1000)
     
     def clear_all(self):
         """Turn off all LEDs"""
@@ -108,13 +115,8 @@ class HardwareController:
     
     def show_success_animation(self):
         """Show success animation on LED strip"""
-        self.led_strip.glow(Colors.GREEN, wait_ms=20)
+        self.led_strip.flash(Colors.GREEN)
     
     def show_error_animation(self):
         """Show error animation on LED strip"""
-        start_time = time.time()
-        while time.time() - start_time < 2.0:
-            self.led_strip.set_color_all(Colors.RED)
-            time.sleep(0.3)
-            self.led_strip.clear_all()
-            time.sleep(0.3) 
+        self.led_strip.flash(Colors.RED)
