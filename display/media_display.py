@@ -91,6 +91,13 @@ class SimpleMediaDisplay:
         except Exception as e:
             print(f"⚠️  Error closing display: {e}")
     
+    def _reinitialize_display(self):
+        """Reinitialize display if there are context issues"""
+        print("🔄 Reinitializing display...")
+        self._close_display()
+        time.sleep(0.1)  # Small delay
+        self._initialize_display()
+    
     def _load_and_scale_image(self, image_path):
         """Load and scale image to fit screen while maintaining aspect ratio"""
         try:
@@ -146,9 +153,6 @@ class SimpleMediaDisplay:
         except Exception as e:
             print(f"❌ Error displaying image: {e}")
             return False
-        finally:
-            # Always close Pygame after displaying
-            self._close_display()
     
     def show_image(self, state_number):
         """Show image for given state number in fullscreen"""
@@ -163,20 +167,20 @@ class SimpleMediaDisplay:
             print(f"Image file not found: {source_path}")
             return False
 
-        try:
-            # Initialize fresh Pygame display
+        # Initialize display if not already initialized
+        if not self.display_initialized:
             self._initialize_display()
             
             if not self.display_initialized:
                 print(f"❌ Failed to initialize display for: {image_file}")
                 return False
-            
+        
+        try:
             # Load and scale image
             image_surface, position = self._load_and_scale_image(source_path)
             
             if image_surface is None:
                 print(f"Failed to load image: {image_file}")
-                self._close_display()
                 return False
             
             # Display image
@@ -189,12 +193,27 @@ class SimpleMediaDisplay:
                 print(f"✅ Displayed: {image_file} (State: {state_number})")
                 return True
             else:
-                print(f"Failed to display image: {image_file}")
-                return False
+                # Try to reinitialize display if display failed
+                print(f"Display failed, trying to reinitialize...")
+                self._reinitialize_display()
+                
+                # Try display again
+                success = self._display_image(image_surface, position)
+                if success:
+                    self.current_image_path = str(source_path)
+                    self.current_image_surface = image_surface
+                    print(f"✅ Displayed after reinit: {image_file} (State: {state_number})")
+                    return True
+                else:
+                    print(f"Failed to display image even after reinit: {image_file}")
+                    return False
                 
         except Exception as e:
             print(f"❌ Error in show_image: {e}")
-            self._close_display()
+            # Try to reinitialize on any error
+            if "context" in str(e).lower() or "badaccess" in str(e).lower():
+                print("🔄 Context error detected, reinitializing display...")
+                self._reinitialize_display()
             return False
     
     def set_acc(self, value):
