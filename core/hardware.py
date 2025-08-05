@@ -26,6 +26,9 @@ class LEDStrip:
     
     def set_color_all(self, color):
         """Set all LEDs to the same color"""
+        # Clear LEDs first to ensure clean transition
+        self.clear_all()
+        
         for i in range(HardwareConfig.LED_COUNT):
             self.strip.setPixelColor(i, Color(*color))
         self.strip.show()

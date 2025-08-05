@@ -118,6 +118,7 @@ class TimingConfig:
     RESULT_TO_IDLE_DELAY = 1        # seconds - delay before returning to idle after error
     REWARD_DELAY = 2               # seconds - delay before showing reward after correct bin
     REWARD_DISPLAY_TIME = 5         # seconds - time to show reward message
+    QRCODE_DISPLAY_TIME = 3         # seconds - time to show QR code message
     INCORRECT_DISPLAY_TIME = 2      # seconds - time to show incorrect message
 
 # AI Configuration

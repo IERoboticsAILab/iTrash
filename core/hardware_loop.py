@@ -169,8 +169,27 @@ class HardwareLoop:
                 
 
                 
-                # Auto-reset after delay
-                self._start_auto_reset(TimingConfig.REWARD_DISPLAY_TIME)
+                # Start QR code phase after reward
+                def qrcode_auto_reset():
+                    import time
+                    time.sleep(TimingConfig.REWARD_DISPLAY_TIME)
+                    state.update("phase", "qrcode")
+                    
+                    # Auto-reset to idle after QR code display time
+                    def final_reset():
+                        import time
+                        time.sleep(TimingConfig.QRCODE_DISPLAY_TIME)
+                        state.update("phase", "idle")
+                        state.update("last_classification", None)
+                    
+                    import threading
+                    final_reset_thread = threading.Thread(target=final_reset, daemon=True)
+                    final_reset_thread.start()
+                
+                # Start QR code phase in separate thread
+                import threading
+                qrcode_thread = threading.Thread(target=qrcode_auto_reset, daemon=True)
+                qrcode_thread.start()
                 
             else:
                 # Wrong bin

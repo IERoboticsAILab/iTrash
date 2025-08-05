@@ -210,6 +210,7 @@ class SimpleMediaDisplay:
                     "brown_trash": SystemStates.THROW_BROWN,
                     "success": SystemStates.SUCCESS,
                     "reward": SystemStates.REWARD,
+                    "qrcode": SystemStates.QR_CODES,
                     "incorrect": SystemStates.INCORRECT,
                     "timeout": SystemStates.TIMEOUT,
                     "error": SystemStates.USER_CONFIRMATION,  # Show try_again_green.png on error
@@ -292,6 +293,9 @@ class SimpleMediaDisplay:
                         # QR codes state - qr_codes.png
                         "qr_codes": (0, 0, 255),              # Blue (QR code indicator)
                         
+                        # QR code phase - qr_codes.png (LEDs off)
+                        "qrcode": (0, 0, 0),                  # Off (QR code display)
+                        
                         # Reward state - reward_received_new.png
                         "reward": (0, 255, 0),                # Green (reward indicator)
                         
@@ -309,6 +313,9 @@ class SimpleMediaDisplay:
                         # Error state - try_again_green.png
                         "error": (255, 0, 0),                 # Red (error indicator)
                     }
+                    
+                    # Clear LEDs first to ensure clean transition
+                    led_strip.clear_all()
                     
                     color = phase_colors.get(phase, (0, 0, 0))
                     led_strip.set_color_all(color)
@@ -365,6 +372,9 @@ class SimpleMediaDisplay:
                         # State 11 - throw_brown.png
                         SystemStates.THROW_BROWN: (139, 69, 19),         # Brown
                     }
+                    
+                    # Clear LEDs first to ensure clean transition
+                    led_strip.clear_all()
                     
                     color = state_colors.get(state_value, (0, 0, 0))
                     led_strip.set_color_all(color)
