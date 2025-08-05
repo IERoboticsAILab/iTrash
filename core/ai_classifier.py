@@ -151,26 +151,9 @@ class ClassificationManager:
     
     async def process_image_with_feedback(self, image):
         """Process image with LED feedback during classification"""
-        if self.led_strip:
-            # Start processing animation
-            self.led_strip.set_color_all((255, 255, 255))  # White for processing
-        
         # Perform classification (run in thread to avoid blocking)
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(None, self.classifier.classify, image)
-        
-        if self.led_strip:
-            if result:
-                # Success - show green briefly
-                self.led_strip.set_color_all((0, 255, 0))
-                await asyncio.sleep(0.5)
-            else:
-                # Error - show red briefly
-                self.led_strip.set_color_all((255, 0, 0))
-                await asyncio.sleep(0.5)
-            
-            # Clear LEDs
-            self.led_strip.clear_all()
         
         return result
     

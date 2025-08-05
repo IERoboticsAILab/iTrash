@@ -113,10 +113,3 @@ class HardwareController:
         self.led_strip.clear_all()
         self.proximity_sensors.cleanup()
     
-    def show_success_animation(self):
-        """Show success animation on LED strip"""
-        self.led_strip.flash(Colors.GREEN)
-    
-    def show_error_animation(self):
-        """Show error animation on LED strip"""
-        self.led_strip.flash(Colors.RED)

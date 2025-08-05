@@ -183,9 +183,16 @@ class SimpleMediaDisplay:
         if value in self.image_mapping:
             self.acc = value
             self.show_image(value)
+            
+            # Update LED color based on the new display state
+            self._update_led_color_for_state(value)
     
     def monitor_state(self):
         """Monitor state changes"""
+        # Ensure initial state is set
+        if self.acc == 0:
+            self.set_acc(SystemStates.IDLE)
+        
         while self.is_running:
             time.sleep(0.1)
             
@@ -221,25 +228,26 @@ class SimpleMediaDisplay:
     
     def start(self):
         """Start the display system"""
+        if not self.display_initialized:
+            self.is_running = True
+            self.timer_thread = threading.Thread(target=self.monitor_state, daemon=True)
+            self.timer_thread.start()
+            return
+        
         self.is_running = True
         
-        # Clear LEDs first (before starting monitor)
-        self._clear_leds()
-        
-        # Start monitoring thread
+        # Start monitoring first
         self.timer_thread = threading.Thread(target=self.monitor_state, daemon=True)
         self.timer_thread.start()
         
         # Small delay to ensure monitor is running
         time.sleep(0.1)
         
-        # Show initial image only if display is initialized
-        if self.display_initialized:
-            self.show_image(SystemStates.IDLE)
-            # Set initial LED color for idle state
-            self._update_led_color("idle")
-            # Set acc to prevent monitor from triggering change
-            self.acc = SystemStates.IDLE
+        # Show initial image after monitor is active
+        self.show_image(SystemStates.IDLE)
+        
+        # Set initial LED color for idle state
+        self._update_led_color_for_state(SystemStates.IDLE)
     
     def stop(self):
         """Stop the display system"""
@@ -254,29 +262,8 @@ class SimpleMediaDisplay:
             except Exception as e:
                 pass
     
-    def _clear_leds(self):
-        """Clear all LEDs on startup"""
-        try:
-            # Import here to avoid circular imports
-            from core.hardware_loop import get_hardware_loop
-            
-            hardware_loop = get_hardware_loop()
-            if hardware_loop and hardware_loop.hardware:
-                led_strip = hardware_loop.hardware.get_led_strip()
-                if led_strip:
-                    led_strip.clear_all()
-                    print("✅ LEDs cleared on startup")
-                else:
-                    print("⚠️  LED strip not available during startup")
-            else:
-                print("⚠️  Hardware loop not available during startup")
-        except Exception as e:
-            print(f"⚠️  LED clearing failed during startup: {e}")
-            # Silently fail if LED control is not available
-            pass
-    
     def _update_led_color(self, phase):
-        """Update LED color based on current phase"""
+        """Update LED color based on current phase - synchronized with display images"""
         try:
             # Import here to avoid circular imports
             from core.hardware_loop import get_hardware_loop
@@ -285,25 +272,103 @@ class SimpleMediaDisplay:
             if hardware_loop and hardware_loop.hardware:
                 led_strip = hardware_loop.hardware.get_led_strip()
                 if led_strip:
-                    # Map phases to LED colors
+                    # Map phases to LED colors - synchronized with display images
                     phase_colors = {
-                        "idle": (0, 0, 0),           # Off
-                        "processing": (255, 255, 255), # White
-                        "blue_trash": (0, 0, 255),     # Blue
-                        "yellow_trash": (255, 255, 0), # Yellow
-                        "brown_trash": (139, 69, 19),  # Brown
-                        "error": (255, 0, 0),          # Red
-                        "success": (0, 255, 0),        # Green
-                        "reward": (0, 255, 0),         # Green
-                        "incorrect": (255, 0, 0),      # Red
-                        "timeout": (255, 0, 0)         # Red
+                        # Idle state - white.png
+                        "idle": (0, 0, 0),                    # Off (clean white screen)
+                        
+                        # Processing state - processing_new.png
+                        "processing": (255, 255, 255),        # White (processing indicator)
+                        
+                        # Show trash state - show_trash.png
+                        "show_trash": (255, 255, 255),        # White (show trash indicator)
+                        
+                        # User confirmation state - try_again_green.png (error case)
+                        "user_confirmation": (255, 0, 0),     # Red (error indicator)
+                        
+                        # Success state - great_job.png
+                        "success": (0, 255, 0),               # Green (success indicator)
+                        
+                        # QR codes state - qr_codes.png
+                        "qr_codes": (0, 0, 255),              # Blue (QR code indicator)
+                        
+                        # Reward state - reward_received_new.png
+                        "reward": (0, 255, 0),                # Green (reward indicator)
+                        
+                        # Incorrect state - incorrect_new.png
+                        "incorrect": (255, 0, 0),             # Red (incorrect indicator)
+                        
+                        # Timeout state - timeout_new.png
+                        "timeout": (255, 0, 0),               # Red (timeout indicator)
+                        
+                        # Trash-specific states
+                        "blue_trash": (0, 0, 255),            # Blue (throw_blue.png)
+                        "yellow_trash": (255, 255, 0),        # Yellow (throw_yellow.png)
+                        "brown_trash": (139, 69, 19),         # Brown (throw_brown.png)
+                        
+                        # Error state - try_again_green.png
+                        "error": (255, 0, 0),                 # Red (error indicator)
                     }
                     
                     color = phase_colors.get(phase, (0, 0, 0))
                     led_strip.set_color_all(color)
-                    print(f"✅ LED color set to {color} for phase '{phase}'")
         except Exception as e:
-            print(f"⚠️  LED color update failed for phase '{phase}': {e}")
+            # Silently fail if LED control is not available
+            pass
+    
+    def _update_led_color_for_state(self, state_value):
+        """Update LED color based on display state value - synchronized with images"""
+        try:
+            # Import here to avoid circular imports
+            from core.hardware_loop import get_hardware_loop
+            from config.settings import SystemStates
+            
+            hardware_loop = get_hardware_loop()
+            if hardware_loop and hardware_loop.hardware:
+                led_strip = hardware_loop.hardware.get_led_strip()
+                if led_strip:
+                    # Map display states to LED colors - synchronized with images
+                    state_colors = {
+                        # State 0 - white.png (idle)
+                        SystemStates.IDLE: (0, 0, 0),                    # Off
+                        
+                        # State 1 - processing_new.png
+                        SystemStates.PROCESSING: (255, 255, 255),        # White
+                        
+                        # State 2 - show_trash.png
+                        SystemStates.SHOW_TRASH: (255, 255, 255),        # White
+                        
+                        # State 3 - try_again_green.png (error/retry)
+                        SystemStates.USER_CONFIRMATION: (255, 0, 0),     # Red
+                        
+                        # State 4 - great_job.png (success)
+                        SystemStates.SUCCESS: (0, 255, 0),               # Green
+                        
+                        # State 5 - qr_codes.png
+                        SystemStates.QR_CODES: (0, 0, 255),              # Blue
+                        
+                        # State 6 - reward_received_new.png
+                        SystemStates.REWARD: (0, 255, 0),                # Green
+                        
+                        # State 7 - incorrect_new.png
+                        SystemStates.INCORRECT: (255, 0, 0),             # Red
+                        
+                        # State 8 - timeout_new.png
+                        SystemStates.TIMEOUT: (255, 0, 0),               # Red
+                        
+                        # State 9 - throw_yellow.png
+                        SystemStates.THROW_YELLOW: (255, 255, 0),        # Yellow
+                        
+                        # State 10 - throw_blue.png
+                        SystemStates.THROW_BLUE: (0, 0, 255),            # Blue
+                        
+                        # State 11 - throw_brown.png
+                        SystemStates.THROW_BROWN: (139, 69, 19),         # Brown
+                    }
+                    
+                    color = state_colors.get(state_value, (0, 0, 0))
+                    led_strip.set_color_all(color)
+        except Exception as e:
             # Silently fail if LED control is not available
             pass
     

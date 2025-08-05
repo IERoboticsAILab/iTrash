@@ -164,38 +164,7 @@ async def capture_image():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/hardware/led/{color}")
-async def set_led_color(color: str):
-    """Set LED strip color"""
-    hardware = get_hardware()
-    if not hardware:
-        raise HTTPException(status_code=500, detail="Hardware not available")
-    
-    try:
-        led_strip = hardware.get_led_strip()
-        
-        # Color mapping
-        color_map = {
-            "red": (255, 0, 0),
-            "green": (0, 255, 0),
-            "blue": (0, 0, 255),
-            "yellow": (255, 255, 0),
-            "white": (255, 255, 255),
-            "off": (0, 0, 0)
-        }
-        
-        if color not in color_map:
-            raise HTTPException(status_code=400, detail="Invalid color")
-        
-        led_strip.set_color_all(color_map[color])
-        
-        return {
-            "status": "led_updated",
-            "color": color
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/hardware/sensors")
 async def get_sensor_status():
@@ -223,14 +192,6 @@ async def complete_processing():
     state.update("phase", "idle")
     state.update("reward", False)
     state.update("last_classification", None)
-    
-    # Clear LEDs
-    hardware = get_hardware()
-    if hardware:
-        try:
-            hardware.get_led_strip().clear_all()
-        except:
-            pass
     
     return {
         "status": "processing_complete",

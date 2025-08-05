@@ -102,8 +102,7 @@ class HardwareLoop:
                     state.update("phase", "processing")
                     state.update_sensor_status("object_detected", True)
                     
-                    # Show white LEDs for processing
-                    led_strip.set_color_all(Colors.WHITE)
+
                     
                     # Process the detection
                     self._process_trash_detection()
@@ -168,9 +167,7 @@ class HardwareLoop:
                 
                 state.update("phase", "reward")
                 
-                # Show success animation
-                if self.hardware:
-                    self.hardware.show_success_animation()
+
                 
                 # Auto-reset after delay
                 self._start_auto_reset(TimingConfig.REWARD_DISPLAY_TIME)
@@ -179,9 +176,7 @@ class HardwareLoop:
                 # Wrong bin
                 state.update("phase", "incorrect")
                 
-                # Show error animation
-                if self.hardware:
-                    self.hardware.show_error_animation()
+
                 
                 # Auto-reset for incorrect bin
                 self._start_auto_reset(TimingConfig.INCORRECT_DISPLAY_TIME)
@@ -264,12 +259,7 @@ class HardwareLoop:
         """Stop the hardware loop"""
         self.is_running = False
         
-        # Clear LEDs
-        if self.hardware:
-            try:
-                self.hardware.get_led_strip().clear_all()
-            except:
-                pass
+
         
         # Cleanup hardware
         if self.hardware:
