@@ -69,81 +69,74 @@ class GPTClassifier:
         
         return base64_encoded
     
-    def classify(self, image, max_retries=3):
-        """Classify trash using GPT-4 Vision"""
-        for attempt in range(max_retries):
-            try:
-                base64_image = self._encode_image_to_base64(image)
-                
-                headers = {
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {self.api_key}"
-                }
-                
-                payload = {
-                    "model": self.model,
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": self.prompt
-                                },
-                                {
-                                    "type": "image_url",
-                                    "image_url": {
-                                        "url": f"data:image/jpeg;base64,{base64_image}"
-                                    }
+    def classify(self, image):
+        """Classify trash using GPT-4 Vision - single attempt only"""
+        try:
+            base64_image = self._encode_image_to_base64(image)
+            
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.api_key}"
+            }
+            
+            payload = {
+                "model": self.model,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": self.prompt
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{base64_image}"
                                 }
-                            ]
-                        }
-                    ],
-                    "max_tokens": self.max_tokens
-                }
+                            }
+                        ]
+                    }
+                ],
+                "max_tokens": self.max_tokens
+            }
+            
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                content = result['choices'][0]['message']['content']
                 
-                response = requests.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers=headers,
-                    json=payload,
-                    timeout=30
-                )
+                # Parse JSON response
+                try:
+                    parsed_response = json.loads(content)
+                    trash_class = parsed_response.get('trash_class', '')
+                    
+                    # Validate color
+                    if trash_class in TrashClassification.VALID_COLORS:
+                        print(f"GPT Classification: {trash_class}")
+                        return trash_class
+                    else:
+                        print(f"GPT Response: {content}")
+                        print(f"Invalid color returned by GPT: {trash_class}")
+                        return ""
+                        
+                except json.JSONDecodeError:
+                    print(f"Invalid JSON response from GPT: {content}")
+                    return ""
+                    
+            else:
+                print(f"GPT API error: {response.status_code} - {response.text}")
+                return ""
                 
-                if response.status_code == 200:
-                    result = response.json()
-                    content = result['choices'][0]['message']['content']
-                    
-                    # Parse JSON response
-                    try:
-                        parsed_response = json.loads(content)
-                        trash_class = parsed_response.get('trash_class', '')
-                        
-                        # Validate color
-                        if trash_class in TrashClassification.VALID_COLORS:
-                            print(f"GPT Classification: {trash_class}")
-                            return trash_class
-                        else:
-                            print(f"GPT Response: {content}")
-                            print(f"Invalid color returned by GPT: {trash_class}")
-                            continue
-                            
-                    except json.JSONDecodeError:
-                        print(f"Invalid JSON response from GPT: {content}")
-                        continue
-                        
-                else:
-                    print(f"GPT API error: {response.status_code} - {response.text}")
-                    continue
-                    
-            except Exception as e:
-                print(f"Error in GPT classification (attempt {attempt + 1}): {e}")
-                if attempt < max_retries - 1:
-                    continue
-                else:
-                    break
-        
-        print("GPT classification failed after all retries")
-        return ""
+        except Exception as e:
+            print(f"Error in GPT classification: {e}")
+            return ""
 
 class ClassificationManager:
     """Manages the classification process with LED feedback"""

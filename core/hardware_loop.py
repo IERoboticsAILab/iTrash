@@ -81,8 +81,12 @@ class HardwareLoop:
         
         while self.is_running:
             try:
-                # Check for object detection
-                if proximity_sensors.detect_object_proximity():
+                # Get current phase to check if we should block object detection
+                current_phase = state.get("phase")
+                
+                # Only check for object detection if we're in idle phase
+                # This prevents re-detection while processing or waiting for user confirmation
+                if current_phase == "idle" and proximity_sensors.detect_object_proximity():
                     print("Object detected in hardware loop!")
                     
                     # Update state
@@ -180,6 +184,13 @@ class HardwareLoop:
                     time.sleep(2)  # Show error for 2 seconds
                     state.update("phase", "idle")
                     state.update("reward", False)
+                    
+                    # Clear LEDs
+                    if self.hardware:
+                        try:
+                            self.hardware.get_led_strip().clear_all()
+                        except:
+                            pass
                 
                 # Start auto-reset in separate thread
                 import threading
@@ -236,9 +247,24 @@ class HardwareLoop:
                 finally:
                     loop.close()
             
-            # Start classification in separate thread
+            # Start classification in separate thread with timeout
             classify_thread = threading.Thread(target=classify_async, daemon=True)
             classify_thread.start()
+            
+            # Set a timeout for classification (30 seconds)
+            classify_thread.join(timeout=30)
+            
+            # If thread is still alive after timeout, force reset to idle
+            if classify_thread.is_alive():
+                print("Classification timeout - resetting to idle")
+                state.update("phase", "idle")
+                
+                # Clear LEDs
+                if self.hardware:
+                    try:
+                        self.hardware.get_led_strip().clear_all()
+                    except:
+                        pass
             
         except Exception as e:
             print(f"Error in trash detection: {e}")
