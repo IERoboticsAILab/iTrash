@@ -176,13 +176,16 @@ class SimpleMediaDisplay:
                 
                 # Map phase to state number
                 phase_to_state = {
-                    "idle": 0,
-                    "processing": 1,
-                    "show_trash": 2,
-                    "user_confirmation": 3,
-                    "reward": 4,
-                    "timeout": 5,
-                    "error": 6
+                    "idle": SystemStates.IDLE,
+                    "processing": SystemStates.PROCESSING,
+                    "show_trash": SystemStates.SHOW_TRASH,
+                    "user_confirmation": SystemStates.USER_CONFIRMATION,
+                    "success": SystemStates.SUCCESS,
+                    "reward": SystemStates.REWARD,
+                    "incorrect": SystemStates.INCORRECT,
+                    "timeout": SystemStates.TIMEOUT,
+                    "error": SystemStates.INCORRECT,  # Use incorrect state for errors
+                    "qr_codes": SystemStates.QR_CODES
                 }
                 
                 new_state = phase_to_state.get(current_phase, 0)
