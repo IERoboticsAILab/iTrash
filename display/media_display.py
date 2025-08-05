@@ -7,9 +7,18 @@ import os
 import time
 import threading
 import pygame
+import platform
 from pathlib import Path
 from config.settings import DisplayConfig, SystemStates
 from global_state import state
+
+def is_raspberry_pi():
+    """Check if running on Raspberry Pi"""
+    try:
+        with open('/proc/cpuinfo', 'r') as f:
+            return 'Raspberry Pi' in f.read()
+    except:
+        return platform.machine().startswith('arm')
 
 class SimpleMediaDisplay:
     """Fullscreen display interface using Pygame"""
@@ -40,6 +49,20 @@ class SimpleMediaDisplay:
     def _initialize_display(self):
         """Initialize Pygame display for fullscreen"""
         try:
+            # Check if running on Raspberry Pi
+            if is_raspberry_pi():
+                print("🍓 Raspberry Pi detected - using Pi-specific display setup")
+                # Set display environment for Raspberry Pi
+                os.environ['SDL_VIDEODRIVER'] = 'x11'
+                os.environ['DISPLAY'] = ':0'
+                
+                # Additional Pi-specific settings
+                os.environ['SDL_AUDIODRIVER'] = 'alsa'
+                os.environ['SDL_VIDEO_X11_NODIRECTCOLOR'] = '1'
+            else:
+                print("💻 Non-Raspberry Pi system detected")
+            
+            # Initialize Pygame
             pygame.init()
             
             # Get screen info
@@ -130,6 +153,8 @@ class SimpleMediaDisplay:
         if not source_path.exists():
             print(f"Image file not found: {source_path}")
             return False
+        
+
         
         try:
             # Load and scale image
