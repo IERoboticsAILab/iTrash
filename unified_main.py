@@ -31,8 +31,9 @@ async def lifespan(app: FastAPI):
     
     # Initialize state
     state.update("system_status", "starting")
+    state.update("phase", "idle")  # Ensure initial phase is set
     
-    # Start display manager
+    # Start display manager first
     global display_manager
     try:
         display_manager = DisplayManager()
@@ -40,6 +41,10 @@ async def lifespan(app: FastAPI):
         print("Display manager started")
     except Exception as e:
         print(f"Failed to start display manager: {e}")
+    
+    # Small delay to ensure display is ready
+    import time
+    time.sleep(0.2)
     
     # Start background hardware loop
     global hardware_loop

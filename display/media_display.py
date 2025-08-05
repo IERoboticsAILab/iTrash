@@ -186,6 +186,10 @@ class SimpleMediaDisplay:
     
     def monitor_state(self):
         """Monitor state changes"""
+        # Ensure initial state is set
+        if self.acc == 0:
+            self.set_acc(SystemStates.IDLE)
+        
         while self.is_running:
             time.sleep(0.1)
             
@@ -227,12 +231,15 @@ class SimpleMediaDisplay:
         
         self.is_running = True
         
-        # Show initial image
-        self.show_image(SystemStates.IDLE)
-        
-        # Start monitoring
+        # Start monitoring first
         self.timer_thread = threading.Thread(target=self.monitor_state, daemon=True)
         self.timer_thread.start()
+        
+        # Small delay to ensure monitor is running
+        time.sleep(0.1)
+        
+        # Show initial image after monitor is active
+        self.show_image(SystemStates.IDLE)
     
     def stop(self):
         """Stop the display system"""
