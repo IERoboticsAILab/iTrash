@@ -41,31 +41,12 @@ class SimpleMediaDisplay:
     def _init_display(self):
         """Initialize Pygame display"""
         try:
-            # Prefer KMS/DRM or framebuffer on Raspberry Pi; fallback to X11 if present
-            driver_candidates = ['kmsdrm', 'fbcon', 'x11']
-            init_ok = False
-            for drv in driver_candidates:
-                try:
-                    os.environ['SDL_VIDEODRIVER'] = drv
-                    # Only set DISPLAY for X11
-                    if drv == 'x11':
-                        os.environ['DISPLAY'] = os.environ.get('DISPLAY', ':0')
-                        os.environ['SDL_VIDEO_X11_NODIRECTCOLOR'] = '1'
-                        os.environ['SDL_VIDEO_X11_DGAMOUSE'] = '0'
-                    else:
-                        os.environ.pop('DISPLAY', None)
-                    pygame.display.init()
-                    init_ok = True
-                    break
-                except Exception as e:
-                    try:
-                        pygame.display.quit()
-                    except Exception:
-                        pass
-                    continue
-            if not init_ok:
-                # Final fallback
-                pygame.display.init()
+            # Force X11 driver as requested and set sane defaults
+            os.environ['SDL_VIDEODRIVER'] = 'x11'
+            os.environ['DISPLAY'] = os.environ.get('DISPLAY', ':0')
+            os.environ['SDL_VIDEO_X11_NODIRECTCOLOR'] = '1'
+            os.environ['SDL_VIDEO_X11_DGAMOUSE'] = '0'
+            pygame.display.init()
             
             pygame.init()
             
