@@ -24,6 +24,8 @@ class SimpleMediaDisplay:
         self.screen_width = 1920
         self.screen_height = 1080
         self.image_mapping = DisplayConfig.IMAGE_MAPPING
+        self.preloaded_images = {}
+        self.draw_lock = threading.Lock()
         self.display_initialized = False
         self.last_error_time = 0
         self.error_count = 0
@@ -32,20 +34,6 @@ class SimpleMediaDisplay:
         self.video_path = self._resolve_idle_video_path()
         self.video_thread = None
         self.video_stop_event = threading.Event()
-        self.video_available = bool(self.video_path)  # updated after open attempt
-        
-        # Transition/drawing controls
-        self.screen_draw_lock = threading.Lock()
-        self.last_video_frame_surface = None
-        self.last_video_frame_rect = None
-
-        # Centralized render loop state (single thread does all pygame drawing)
-        self.display_mode = "image"  # "video" or "image"
-        self.render_thread = None
-        self.render_stop_event = threading.Event()
-        self.latest_video_frame = None  # numpy RGB array from video thread
-        self.current_image_surface = None
-        self.current_image_rect = None
         
         # Initialize display
         self._init_display()
@@ -53,13 +41,31 @@ class SimpleMediaDisplay:
     def _init_display(self):
         """Initialize Pygame display"""
         try:
-            # Set environment for Raspberry Pi
-            os.environ['SDL_VIDEODRIVER'] = 'x11'
-            os.environ['DISPLAY'] = ':0'
-            
-            # Additional environment variables to help with display issues
-            os.environ['SDL_VIDEO_X11_NODIRECTCOLOR'] = '1'
-            os.environ['SDL_VIDEO_X11_DGAMOUSE'] = '0'
+            # Prefer KMS/DRM or framebuffer on Raspberry Pi; fallback to X11 if present
+            driver_candidates = ['kmsdrm', 'fbcon', 'x11']
+            init_ok = False
+            for drv in driver_candidates:
+                try:
+                    os.environ['SDL_VIDEODRIVER'] = drv
+                    # Only set DISPLAY for X11
+                    if drv == 'x11':
+                        os.environ['DISPLAY'] = os.environ.get('DISPLAY', ':0')
+                        os.environ['SDL_VIDEO_X11_NODIRECTCOLOR'] = '1'
+                        os.environ['SDL_VIDEO_X11_DGAMOUSE'] = '0'
+                    else:
+                        os.environ.pop('DISPLAY', None)
+                    pygame.display.init()
+                    init_ok = True
+                    break
+                except Exception as e:
+                    try:
+                        pygame.display.quit()
+                    except Exception:
+                        pass
+                    continue
+            if not init_ok:
+                # Final fallback
+                pygame.display.init()
             
             pygame.init()
             
@@ -79,7 +85,10 @@ class SimpleMediaDisplay:
             
             for size, flags in display_modes:
                 try:
-                    self.screen = pygame.display.set_mode(size, flags)
+                    # Prefer double buffering and hardware surface when available
+                    self.screen = pygame.display.set_mode(
+                        size, flags | pygame.DOUBLEBUF | pygame.HWSURFACE
+                    )
                     self.screen_width, self.screen_height = size
                     break
                 except Exception as e:
@@ -89,6 +98,8 @@ class SimpleMediaDisplay:
             if self.screen:
                 pygame.mouse.set_visible(False)
                 self.display_initialized = True
+                # Preload images for current screen size
+                self._preload_images()
             else:
                 self.display_initialized = False
             
@@ -129,17 +140,15 @@ class SimpleMediaDisplay:
     
     def show_image(self, state_number, force_recovery=False):
         """Show image for given state number with optional force recovery"""
-        # If we're in idle state, prefer video when available; otherwise show static image
-        if state_number == SystemStates.IDLE and self.video_path and self.video_available:
+        # If we're in idle state, video playback is responsible for drawing
+        if state_number == SystemStates.IDLE and self.video_path:
             # Ensure video is running
             if not self._is_video_playing():
                 self._start_idle_video()
-            self.display_mode = "video"
             return True
         else:
-            # Leaving idle: stop video decoding
+            # Stop video if we are leaving idle
             self._stop_idle_video()
-            self.display_mode = "image"
         # Force recovery if requested
         if force_recovery:
             if not self._recover_display(force=True):
@@ -149,18 +158,35 @@ class SimpleMediaDisplay:
             return False
         
         try:
-            # Get image path
-            image_file = self.image_mapping[state_number]
-            image_path = Path(self.images_dir) / image_file
-            
-            if not image_path.exists():
+            # Use preloaded, pre-scaled surface if available
+            scaled_img, x, y = self._get_preloaded_surface(state_number)
+            if scaled_img is None:
                 return False
             
-            scaled_img, target_rect = self._prepare_scaled_image_surface(str(image_path))
-            # Cache static image for render thread
-            self.current_image_surface = scaled_img
-            self.current_image_rect = target_rect
-            return True
+            # Display with error handling and draw lock to prevent interleaving with video
+            try:
+                with self.draw_lock:
+                    self.screen.fill((0, 0, 0))
+                    self.screen.blit(scaled_img, (x, y))
+                    pygame.display.flip()
+                return True
+                
+            except pygame.error as e:
+                if "GL context" in str(e) or "BadAccess" in str(e):
+                    if self._recover_display():
+                        # Retry once after recovery
+                        try:
+                            with self.draw_lock:
+                                self.screen.fill((0, 0, 0))
+                                self.screen.blit(scaled_img, (x, y))
+                                pygame.display.flip()
+                                return True
+                        except Exception as retry_e:
+                            return False
+                    else:
+                        return False
+                else:
+                    raise e
             
         except Exception as e:
             # Try to recover from certain types of errors
@@ -170,6 +196,36 @@ class SimpleMediaDisplay:
                     return self.show_image(state_number)
             
             return False
+
+    def _preload_images(self):
+        """Preload and scale images to memory for fast, seamless transitions."""
+        preloaded = {}
+        for state_number, image_file in self.image_mapping.items():
+            try:
+                image_path = Path(self.images_dir) / image_file
+                if not image_path.exists():
+                    continue
+                img = pygame.image.load(str(image_path)).convert()
+                img_width, img_height = img.get_size()
+                img_ratio = img_width / img_height
+                screen_ratio = self.screen_width / self.screen_height
+                if img_ratio > screen_ratio:
+                    new_width = self.screen_width
+                    new_height = int(self.screen_width / img_ratio)
+                else:
+                    new_height = self.screen_height
+                    new_width = int(self.screen_height * img_ratio)
+                scaled_img = pygame.transform.smoothscale(img, (new_width, new_height))
+                x = (self.screen_width - new_width) // 2
+                y = (self.screen_height - new_height) // 2
+                preloaded[state_number] = (scaled_img, x, y)
+            except Exception:
+                continue
+        self.preloaded_images = preloaded
+
+    def _get_preloaded_surface(self, state_number):
+        """Return a tuple (surface, x, y) for the given state, if preloaded."""
+        return self.preloaded_images.get(state_number, (None, None, None))
     
     def _resolve_idle_video_path(self):
         """Resolve the path to the idle video, preferring repo-relative path."""
@@ -212,14 +268,11 @@ class SimpleMediaDisplay:
         self.video_thread = None
 
     def _idle_video_loop(self):
-        """Continuously decode the idle video and publish frames to the render loop."""
+        """Continuously play the idle video while in IDLE state."""
         cap = None
         try:
             cap = cv2.VideoCapture(self.video_path)
             if not cap.isOpened():
-                # Fallback to static image
-                self.video_available = False
-                self.display_mode = "image"
                 return
             fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
             delay = max(1.0 / float(fps), 0.01)
@@ -236,12 +289,43 @@ class SimpleMediaDisplay:
                     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                     continue
                 
-                # Convert BGR -> RGB and publish for render loop
+                # Convert BGR -> RGB
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                # Assign latest frame; copy to avoid reuse of buffer by OpenCV
-                self.latest_video_frame = frame_rgb.copy()
+                frame_height, frame_width = frame_rgb.shape[:2]
                 
-                time.sleep(delay)
+                # Scale to fit screen preserving aspect ratio
+                img_ratio = frame_width / frame_height
+                screen_ratio = self.screen_width / self.screen_height
+                if img_ratio > screen_ratio:
+                    new_width = self.screen_width
+                    new_height = int(self.screen_width / img_ratio)
+                else:
+                    new_height = self.screen_height
+                    new_width = int(self.screen_height * img_ratio)
+                
+                # Create pygame surface from image
+                try:
+                    surf = pygame.image.frombuffer(
+                        frame_rgb.tobytes(), (frame_width, frame_height), 'RGB'
+                    )
+                    surf = pygame.transform.scale(surf, (new_width, new_height))
+                    x = (self.screen_width - new_width) // 2
+                    y = (self.screen_height - new_height) // 2
+                    
+                    with self.draw_lock:
+                        self.screen.fill((0, 0, 0))
+                        self.screen.blit(surf, (x, y))
+                        pygame.display.flip()
+                except Exception:
+                    # If display error occurs, try recovery once
+                    if self._recover_display():
+                        continue
+                    else:
+                        break
+                
+                # Wait for the next frame or stop immediately when requested
+                if self.video_stop_event.wait(delay):
+                    break
         finally:
             try:
                 if cap is not None:
@@ -249,52 +333,15 @@ class SimpleMediaDisplay:
             except Exception:
                 pass
 
-    def _prepare_scaled_image_surface(self, image_path: str):
-        """Load an image and return a scaled surface and its centered rect."""
-        img = pygame.image.load(image_path).convert()
-        img_width, img_height = img.get_size()
-        img_ratio = img_width / img_height
-        screen_ratio = self.screen_width / self.screen_height
-        if img_ratio > screen_ratio:
-            new_width = self.screen_width
-            new_height = int(self.screen_width / img_ratio)
-        else:
-            new_height = self.screen_height
-            new_width = int(self.screen_height * img_ratio)
-        scaled_img = pygame.transform.scale(img, (new_width, new_height))
-        x = (self.screen_width - new_width) // 2
-        y = (self.screen_height - new_height) // 2
-        return scaled_img, pygame.Rect(x, y, new_width, new_height)
-
-
     def set_acc(self, value):
         """Set state and update display"""
         if value in self.image_mapping:
             self.acc = value
             # For idle state, start video; for others, show static image
-            if value == SystemStates.IDLE:
-                if self.video_path and self.video_available:
-                    # Preload idle static image as fallback until first frame arrives
-                    try:
-                        idle_file = self.image_mapping.get(SystemStates.IDLE)
-                        if idle_file:
-                            idle_path = Path(self.images_dir) / idle_file
-                            if idle_path.exists():
-                                surf, rect = self._prepare_scaled_image_surface(str(idle_path))
-                                self.current_image_surface = surf
-                                self.current_image_rect = rect
-                    except Exception:
-                        pass
-                    self.display_mode = "video"
-                    self._start_idle_video()
-                else:
-                    # Fallback to static idle image only
-                    self.display_mode = "image"
-                    self._stop_idle_video()
-                    self.show_image(SystemStates.IDLE)
+            if value == SystemStates.IDLE and self.video_path:
+                self._start_idle_video()
             else:
                 self._stop_idle_video()
-                self.display_mode = "image"
                 self.show_image(value)
             
             # Update LED color based on the new display state
@@ -340,57 +387,6 @@ class SimpleMediaDisplay:
             except Exception as e:
                 print(f"Monitor error: {e}")
     
-    def _prepare_surface_from_rgb_array(self, rgb_array):
-        """Create a scaled pygame surface from an RGB numpy array."""
-        frame_height, frame_width = rgb_array.shape[:2]
-        img_ratio = frame_width / frame_height
-        screen_ratio = self.screen_width / self.screen_height
-        if img_ratio > screen_ratio:
-            new_width = self.screen_width
-            new_height = int(self.screen_width / img_ratio)
-        else:
-            new_height = self.screen_height
-            new_width = int(self.screen_height * img_ratio)
-        surf = pygame.image.frombuffer(rgb_array.tobytes(), (frame_width, frame_height), 'RGB')
-        surf = pygame.transform.scale(surf, (new_width, new_height))
-        x = (self.screen_width - new_width) // 2
-        y = (self.screen_height - new_height) // 2
-        return surf, pygame.Rect(x, y, new_width, new_height)
-
-    def _render_loop(self, target_fps: int = 24):
-        """Dedicated render loop that is the only thread calling pygame display APIs."""
-        delay = 1.0 / float(max(target_fps, 1))
-        while self.is_running and not self.render_stop_event.is_set():
-            try:
-                with self.screen_draw_lock:
-                    if not self.screen:
-                        pass
-                    elif self.display_mode == "video" and self.latest_video_frame is not None:
-                        try:
-                            surf, rect = self._prepare_surface_from_rgb_array(self.latest_video_frame)
-                            self.last_video_frame_surface = surf.copy()
-                            self.last_video_frame_rect = rect
-                            self.screen.fill((0, 0, 0))
-                            self.screen.blit(surf, rect.topleft)
-                            pygame.event.pump()
-                            pygame.display.flip()
-                        except Exception:
-                            pass
-                    elif self.display_mode == "video" and self.latest_video_frame is None and self.current_image_surface is not None:
-                        # Fallback: show cached idle image until first video frame arrives
-                        self.screen.fill((0, 0, 0))
-                        self.screen.blit(self.current_image_surface, self.current_image_rect.topleft)
-                        pygame.event.pump()
-                        pygame.display.flip()
-                    elif self.display_mode == "image" and self.current_image_surface is not None:
-                        self.screen.fill((0, 0, 0))
-                        self.screen.blit(self.current_image_surface, self.current_image_rect.topleft)
-                        pygame.event.pump()
-                        pygame.display.flip()
-            except Exception:
-                pass
-            time.sleep(delay)
-
     def start(self):
         """Start the display system"""
         if not self.display_initialized:
@@ -404,10 +400,6 @@ class SimpleMediaDisplay:
         # Start monitoring first
         self.timer_thread = threading.Thread(target=self.monitor_state, daemon=True)
         self.timer_thread.start()
-        # Start render thread
-        self.render_stop_event.clear()
-        self.render_thread = threading.Thread(target=self._render_loop, daemon=True)
-        self.render_thread.start()
         
         # Small delay to ensure monitor is running
         time.sleep(0.1)
@@ -425,12 +417,9 @@ class SimpleMediaDisplay:
         """Stop the display system"""
         self.is_running = False
         self._stop_idle_video()
-        self.render_stop_event.set()
         
         if self.timer_thread:
             self.timer_thread.join(timeout=1)
-        if self.render_thread:
-            self.render_thread.join(timeout=1)
         
         if self.screen:
             try:
