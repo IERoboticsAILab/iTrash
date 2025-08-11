@@ -33,6 +33,11 @@ class SimpleMediaDisplay:
         self.video_thread = None
         self.video_stop_event = threading.Event()
         
+        # Transition/drawing controls
+        self.screen_draw_lock = threading.Lock()
+        self.last_video_frame_surface = None
+        self.last_video_frame_rect = None
+        
         # Initialize display
         self._init_display()
     
@@ -122,7 +127,12 @@ class SimpleMediaDisplay:
                 self._start_idle_video()
             return True
         else:
-            # Stop video if we are leaving idle
+            # Leaving idle: capture last video frame for crossfade, then stop video
+            from_surface = None
+            from_rect = None
+            if self._is_video_playing() and self.last_video_frame_surface is not None:
+                from_surface = self.last_video_frame_surface
+                from_rect = self.last_video_frame_rect
             self._stop_idle_video()
         # Force recovery if requested
         if force_recovery:
@@ -140,32 +150,17 @@ class SimpleMediaDisplay:
             if not image_path.exists():
                 return False
             
-            # Load and scale image
-            img = pygame.image.load(str(image_path))
-            img_width, img_height = img.get_size()
+            scaled_img, target_rect = self._prepare_scaled_image_surface(str(image_path))
             
-            # Scale to fit screen
-            img_ratio = img_width / img_height
-            screen_ratio = self.screen_width / self.screen_height
-            
-            if img_ratio > screen_ratio:
-                new_width = self.screen_width
-                new_height = int(self.screen_width / img_ratio)
-            else:
-                new_height = self.screen_height
-                new_width = int(self.screen_height * img_ratio)
-            
-            scaled_img = pygame.transform.scale(img, (new_width, new_height))
-            
-            # Center image
-            x = (self.screen_width - new_width) // 2
-            y = (self.screen_height - new_height) // 2
-            
-            # Display with error handling
+            # Display with optional crossfade
             try:
-                self.screen.fill((0, 0, 0))
-                self.screen.blit(scaled_img, (x, y))
-                pygame.display.flip()
+                if from_surface is not None:
+                    self._crossfade_surfaces(from_surface, from_rect, scaled_img, target_rect, duration=0.25, steps=10)
+                else:
+                    with self.screen_draw_lock:
+                        self.screen.fill((0, 0, 0))
+                        self.screen.blit(scaled_img, target_rect.topleft)
+                        pygame.display.flip()
                 return True
                 
             except pygame.error as e:
@@ -173,11 +168,12 @@ class SimpleMediaDisplay:
                     if self._recover_display():
                         # Retry once after recovery
                         try:
-                            self.screen.fill((0, 0, 0))
-                            self.screen.blit(scaled_img, (x, y))
-                            pygame.display.flip()
+                            with self.screen_draw_lock:
+                                self.screen.fill((0, 0, 0))
+                                self.screen.blit(scaled_img, target_rect.topleft)
+                                pygame.display.flip()
                             return True
-                        except Exception as retry_e:
+                        except Exception:
                             return False
                     else:
                         return False
@@ -273,14 +269,19 @@ class SimpleMediaDisplay:
                 try:
                     surf = pygame.image.frombuffer(
                         frame_rgb.tobytes(), (frame_width, frame_height), 'RGB'
-                    )
+                    ).convert()
                     surf = pygame.transform.scale(surf, (new_width, new_height))
                     x = (self.screen_width - new_width) // 2
                     y = (self.screen_height - new_height) // 2
                     
-                    self.screen.fill((0, 0, 0))
-                    self.screen.blit(surf, (x, y))
-                    pygame.display.flip()
+                    # Store last frame for smooth transition
+                    self.last_video_frame_surface = surf.copy()
+                    self.last_video_frame_rect = pygame.Rect(x, y, new_width, new_height)
+                    
+                    with self.screen_draw_lock:
+                        self.screen.fill((0, 0, 0))
+                        self.screen.blit(surf, (x, y))
+                        pygame.display.flip()
                 except Exception:
                     # If display error occurs, try recovery once
                     if self._recover_display():
@@ -296,12 +297,66 @@ class SimpleMediaDisplay:
             except Exception:
                 pass
 
+    def _prepare_scaled_image_surface(self, image_path: str):
+        """Load an image and return a scaled surface and its centered rect."""
+        img = pygame.image.load(image_path).convert()
+        img_width, img_height = img.get_size()
+        img_ratio = img_width / img_height
+        screen_ratio = self.screen_width / self.screen_height
+        if img_ratio > screen_ratio:
+            new_width = self.screen_width
+            new_height = int(self.screen_width / img_ratio)
+        else:
+            new_height = self.screen_height
+            new_width = int(self.screen_height * img_ratio)
+        scaled_img = pygame.transform.scale(img, (new_width, new_height))
+        x = (self.screen_width - new_width) // 2
+        y = (self.screen_height - new_height) // 2
+        return scaled_img, pygame.Rect(x, y, new_width, new_height)
+
+    def _crossfade_surfaces(self, from_surface, from_rect, to_surface, to_rect, duration=0.25, steps=10):
+        """Crossfade from one surface to another smoothly."""
+        if not self.screen:
+            return
+        step_delay = max(duration / max(steps, 1), 0.005)
+        for i in range(steps + 1):
+            alpha = int(255 * (i / steps))
+            with self.screen_draw_lock:
+                # Draw background
+                self.screen.fill((0, 0, 0))
+                # Draw from_surface at full or inverse alpha
+                self.screen.blit(from_surface, from_rect.topleft)
+                # Overlay to_surface with increasing alpha
+                if alpha > 0:
+                    overlay = to_surface.copy()
+                    overlay.set_alpha(alpha)
+                    self.screen.blit(overlay, to_rect.topleft)
+                pygame.display.flip()
+            time.sleep(step_delay)
+
+    def _fade_to_black(self, duration=0.2, steps=8):
+        """Fade the current screen to black quickly."""
+        if not self.screen:
+            return
+        step_delay = max(duration / max(steps, 1), 0.005)
+        overlay = pygame.Surface((self.screen_width, self.screen_height))
+        overlay.fill((0, 0, 0))
+        for i in range(steps + 1):
+            alpha = int(255 * (i / steps))
+            with self.screen_draw_lock:
+                overlay.set_alpha(alpha)
+                self.screen.blit(overlay, (0, 0))
+                pygame.display.flip()
+            time.sleep(step_delay)
+
     def set_acc(self, value):
         """Set state and update display"""
         if value in self.image_mapping:
             self.acc = value
             # For idle state, start video; for others, show static image
             if value == SystemStates.IDLE and self.video_path:
+                # Smoothly fade out any current image before starting video
+                self._fade_to_black(duration=0.15, steps=6)
                 self._start_idle_video()
             else:
                 self._stop_idle_video()
