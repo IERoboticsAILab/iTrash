@@ -7,7 +7,9 @@ import threading
 import time
 import asyncio
 from typing import Optional
-from datetime import datetime, ZoneInfo
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 
 from global_state import state
 from core.hardware import HardwareController
