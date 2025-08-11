@@ -106,20 +106,25 @@ class DisplayConfig:
 
 # Timing Configuration
 class TimingConfig:
-    OBJECT_DETECTION_DELAY = 0.5      # seconds - delay before object detection starts
-    PROCESSING_TIMEOUT = 3        # seconds - timeout for classification
-    USER_CONFIRMATION_TIMEOUT = 10  # seconds - timeout for user action
-    LED_BLINK_INTERVAL = 0.5        # seconds - LED blinking interval
-    IMAGE_DISPLAY_DELAY = 3         # seconds - delay between image displays
-    
-    # Phase transition delays
-    IDLE_TO_PROCESSING_DELAY = 1    # seconds - delay after object detection before processing
-    PROCESSING_TO_RESULT_DELAY = 3  # seconds - delay after classification before showing result
-    RESULT_TO_IDLE_DELAY = 1        # seconds - delay before returning to idle after error
-    REWARD_DELAY = 2               # seconds - delay before showing reward after correct bin
-    REWARD_DISPLAY_TIME = 5         # seconds - time to show reward message
-    QRCODE_DISPLAY_TIME = 3         # seconds - time to show QR code message
-    INCORRECT_DISPLAY_TIME = 2      # seconds - time to show incorrect message
+    """
+    Timing constants grouped by phase/state. Order and comments are for clarity only.
+    Values and names are unchanged to preserve behavior.
+    """
+
+    # IDLE/detection
+    OBJECT_DETECTION_DELAY = 0.5      # seconds — initial delay before object detection starts
+    IDLE_TO_PROCESSING_DELAY = 0.5    # seconds — after object detected, before PROCESSING
+
+    # PROCESSING/classification
+    PROCESSING_TO_RESULT_DELAY = 3    # seconds — after classification, before showing THROW_*
+
+    # REWARD / QR codes
+    REWARD_DELAY = 2                  # seconds — before showing REWARD after correct bin
+    REWARD_DISPLAY_TIME = 5           # seconds — show REWARD
+    QRCODE_DISPLAY_TIME = 5           # seconds — show QR codes before returning to IDLE
+
+    # INCORRECT flow
+    INCORRECT_DISPLAY_TIME = 2        # seconds — show INCORRECT before returning to IDLE
 
 # AI Configuration
 class AIConfig:
