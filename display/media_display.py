@@ -172,10 +172,6 @@ class SimpleMediaDisplay:
             if rel_path.exists():
                 return str(rel_path)
             
-            # Fallback: try absolute path if exists (user-provided during dev)
-            abs_candidate = Path("/Users/farahorfaly/Desktop/Code/VSCode/GitHub/ITrash/iTrash/display/videos/intro.mp4")
-            if abs_candidate.exists():
-                return str(abs_candidate)
         except Exception:
             pass
         return None
