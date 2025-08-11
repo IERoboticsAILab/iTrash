@@ -32,6 +32,7 @@ class SimpleMediaDisplay:
         self.video_path = self._resolve_idle_video_path()
         self.video_thread = None
         self.video_stop_event = threading.Event()
+        self.video_available = bool(self.video_path)  # updated after open attempt
         
         # Transition/drawing controls
         self.screen_draw_lock = threading.Lock()
@@ -128,8 +129,8 @@ class SimpleMediaDisplay:
     
     def show_image(self, state_number, force_recovery=False):
         """Show image for given state number with optional force recovery"""
-        # If we're in idle state, video playback provides frames; render thread draws them
-        if state_number == SystemStates.IDLE and self.video_path:
+        # If we're in idle state, prefer video when available; otherwise show static image
+        if state_number == SystemStates.IDLE and self.video_path and self.video_available:
             # Ensure video is running
             if not self._is_video_playing():
                 self._start_idle_video()
@@ -216,6 +217,9 @@ class SimpleMediaDisplay:
         try:
             cap = cv2.VideoCapture(self.video_path)
             if not cap.isOpened():
+                # Fallback to static image
+                self.video_available = False
+                self.display_mode = "image"
                 return
             fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
             delay = max(1.0 / float(fps), 0.01)
@@ -268,10 +272,29 @@ class SimpleMediaDisplay:
         if value in self.image_mapping:
             self.acc = value
             # For idle state, start video; for others, show static image
-            if value == SystemStates.IDLE and self.video_path:
-                self._start_idle_video()
+            if value == SystemStates.IDLE:
+                if self.video_path and self.video_available:
+                    # Preload idle static image as fallback until first frame arrives
+                    try:
+                        idle_file = self.image_mapping.get(SystemStates.IDLE)
+                        if idle_file:
+                            idle_path = Path(self.images_dir) / idle_file
+                            if idle_path.exists():
+                                surf, rect = self._prepare_scaled_image_surface(str(idle_path))
+                                self.current_image_surface = surf
+                                self.current_image_rect = rect
+                    except Exception:
+                        pass
+                    self.display_mode = "video"
+                    self._start_idle_video()
+                else:
+                    # Fallback to static idle image only
+                    self.display_mode = "image"
+                    self._stop_idle_video()
+                    self.show_image(SystemStates.IDLE)
             else:
                 self._stop_idle_video()
+                self.display_mode = "image"
                 self.show_image(value)
             
             # Update LED color based on the new display state
@@ -349,12 +372,20 @@ class SimpleMediaDisplay:
                             self.last_video_frame_rect = rect
                             self.screen.fill((0, 0, 0))
                             self.screen.blit(surf, rect.topleft)
+                            pygame.event.pump()
                             pygame.display.flip()
                         except Exception:
                             pass
+                    elif self.display_mode == "video" and self.latest_video_frame is None and self.current_image_surface is not None:
+                        # Fallback: show cached idle image until first video frame arrives
+                        self.screen.fill((0, 0, 0))
+                        self.screen.blit(self.current_image_surface, self.current_image_rect.topleft)
+                        pygame.event.pump()
+                        pygame.display.flip()
                     elif self.display_mode == "image" and self.current_image_surface is not None:
                         self.screen.fill((0, 0, 0))
                         self.screen.blit(self.current_image_surface, self.current_image_rect.topleft)
+                        pygame.event.pump()
                         pygame.display.flip()
             except Exception:
                 pass
