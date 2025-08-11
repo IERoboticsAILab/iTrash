@@ -17,9 +17,22 @@ app = FastAPI(title="iTrash API", version="1.0.0")
 
 @app.get("/classification/latest")
 def get_latest_classification():
+    last = state.get("last_classification")
     return {
-        "last_classification": state.get("last_classification"),
-        "phase": state.get("phase", "idle"),
+        "id": "",  # reserved
+        "last_classification" : last if last != "" else "error",
+        "timestamp": state.get("last_classification_ts"),
+    }
+
+
+@app.get("/disposal/latest")
+def get_latest_disposal():
+    disp = state.get("last_disposal") or {}
+    return {
+        "id": "",  # reserved
+        "user_thrown": disp.get("user_thrown"),
+        "timestamp": disp.get("timestamp"),
+        "correct": disp.get("correct"),
     }
 
 

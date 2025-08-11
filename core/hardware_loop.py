@@ -7,7 +7,7 @@ import threading
 import time
 import asyncio
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, ZoneInfo
 
 from global_state import state
 from core.hardware import HardwareController
@@ -164,6 +164,13 @@ class HardwareLoop:
             if bin_type == expected_bin:
                 # Correct bin!
                 state.update("reward", True)
+                # Record disposal event
+                from datetime import datetime
+                state.update("last_disposal", {
+                    "user_thrown": bin_type,
+                    "timestamp": datetime.now(ZoneInfo("Europe/Madrid")),
+                    "correct": True,
+                })
                 
                 # Add delay before showing reward
                 time.sleep(TimingConfig.REWARD_DELAY)
@@ -196,6 +203,13 @@ class HardwareLoop:
             else:
                 # Wrong bin
                 state.update("phase", "incorrect")
+                # Record disposal event as incorrect
+                from datetime import datetime
+                state.update("last_disposal", {
+                    "user_thrown": bin_type,
+                    "timestamp": datetime.now(ZoneInfo("Europe/Madrid")),
+                    "correct": False,
+                })
                 
 
                 
@@ -229,6 +243,7 @@ class HardwareLoop:
                     )
                     if result and result in ["blue", "yellow", "brown"]:
                         state.update("last_classification", result)
+                        state.update("last_classification_ts", datetime.now(ZoneInfo("Europe/Madrid")).isoformat())
                         
                         # Add delay before showing result
                         time.sleep(TimingConfig.PROCESSING_TO_RESULT_DELAY)

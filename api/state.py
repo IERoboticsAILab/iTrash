@@ -14,8 +14,14 @@ class LocalState:
         self.state = {
             "phase": "idle",
             "last_classification": None,
+            "last_classification_ts": None,
             "reward": False,
             "system_status": "initializing",
+            "last_disposal": {
+                "user_thrown": None,
+                "timestamp": None,
+                "correct": None,
+            },
             "sensor_status": {
                 "object_detected": False,
                 "blue_bin": False,
@@ -52,8 +58,14 @@ class LocalState:
             self.state = {
                 "phase": "idle",
                 "last_classification": None,
+                "last_classification_ts": None,
                 "reward": False,
                 "system_status": "ready",
+                "last_disposal": {
+                    "user_thrown": None,
+                    "timestamp": None,
+                    "correct": None,
+                },
                 "sensor_status": {
                     "object_detected": False,
                     "blue_bin": False,
