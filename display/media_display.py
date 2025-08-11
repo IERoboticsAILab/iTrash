@@ -43,9 +43,7 @@ class SimpleMediaDisplay:
         # Initialize display
         self._init_display()
         
-        # LED tracking to ensure correct color is applied whenever state changes
-        self._last_led_state_applied = None
-        self._last_led_apply_time = 0.0
+        # LED updates occur only on state changes
     
     def _init_display(self):
         """Initialize Pygame display"""
@@ -242,12 +240,8 @@ class SimpleMediaDisplay:
                     self.current_mode = "image"
                     self._needs_clear = True
             else:
-                # No state change; periodically re-assert LED color in case hardware missed an update
-                now = time.time()
-                if now - self._last_led_apply_time > 2.0:
-                    self._update_led_color_for_state(self.acc)
-                    self._last_led_state_applied = self.acc
-                    self._last_led_apply_time = now
+                # No state change; do not reapply LEDs
+                pass
 
             # Render one frame
             if self.current_mode == "video" and self.video_cap is not None:
