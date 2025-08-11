@@ -387,10 +387,16 @@ class SimpleMediaDisplay:
                         "error": (255, 0, 0),                 # Red (error indicator)
                     }
                     
-                    # Clear LEDs first to ensure clean transition
-                    led_strip.clear_all()
-                    
                     color = phase_colors.get(phase, (0, 0, 0))
+                    # Idle/off should strictly clear without re-writing zeros
+                    if color == (0, 0, 0):
+                        # Extra-stable off: send two clear frames
+                        led_strip.clear_all()
+                        time.sleep(0.01)
+                        led_strip.clear_all()
+                        return
+                    # Clear then set target color for a clean transition
+                    led_strip.clear_all()
                     led_strip.set_color_all(color)
         except Exception as e:
             # Silently fail if LED control is not available
@@ -446,10 +452,16 @@ class SimpleMediaDisplay:
                         SystemStates.THROW_BROWN: (139, 69, 19),         # Brown
                     }
                     
-                    # Clear LEDs first to ensure clean transition
-                    led_strip.clear_all()
-                    
                     color = state_colors.get(state_value, (0, 0, 0))
+                    # Idle/off should strictly clear without re-writing zeros
+                    if color == (0, 0, 0):
+                        # Extra-stable off: send two clear frames
+                        led_strip.clear_all()
+                        time.sleep(0.01)
+                        led_strip.clear_all()
+                        return
+                    # Clear then set target color for a clean transition
+                    led_strip.clear_all()
                     led_strip.set_color_all(color)
         except Exception as e:
             # Silently fail if LED control is not available
