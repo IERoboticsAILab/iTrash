@@ -38,7 +38,6 @@ class HardwareLoop:
             import time
             time.sleep(delay_seconds)
             state.update("phase", "idle")
-            state.update("last_classification", None)
         
         import threading
         reset_thread = threading.Thread(target=auto_reset, daemon=True)
@@ -184,7 +183,6 @@ class HardwareLoop:
                         import time
                         time.sleep(TimingConfig.QRCODE_DISPLAY_TIME)
                         state.update("phase", "idle")
-                        state.update("last_classification", None)
                     
                     import threading
                     final_reset_thread = threading.Thread(target=final_reset, daemon=True)
