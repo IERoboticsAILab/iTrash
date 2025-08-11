@@ -106,11 +106,11 @@ class DisplayConfig:
 
 # Timing Configuration
 class TimingConfig:
-    OBJECT_DETECTION_DELAY = 1      # seconds - delay before object detection starts
+    OBJECT_DETECTION_DELAY = 0.5      # seconds - delay before object detection starts
     PROCESSING_TIMEOUT = 3        # seconds - timeout for classification
-    USER_CONFIRMATION_TIMEOUT = 20  # seconds - timeout for user action
+    USER_CONFIRMATION_TIMEOUT = 10  # seconds - timeout for user action
     LED_BLINK_INTERVAL = 0.5        # seconds - LED blinking interval
-    IMAGE_DISPLAY_DELAY = 5         # seconds - delay between image displays
+    IMAGE_DISPLAY_DELAY = 3         # seconds - delay between image displays
     
     # Phase transition delays
     IDLE_TO_PROCESSING_DELAY = 1    # seconds - delay after object detection before processing
