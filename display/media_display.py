@@ -45,7 +45,7 @@ class SimpleMediaDisplay:
         
         # LED tracking to ensure correct color is applied whenever state changes
         self._last_led_state_applied = None
-        self._last_led_available = False
+        self._last_led_apply_time = 0.0
     
     def _init_display(self):
         """Initialize Pygame display"""
@@ -206,8 +206,6 @@ class SimpleMediaDisplay:
         if not self.is_running or not self.display_initialized:
             return
         try:
-            # Detect whether LED hardware is currently available
-            led_available = self._is_led_available()
             # Determine desired state from global phase
             current_phase = state.get("phase", "idle")
             phase_to_state = {
@@ -231,11 +229,8 @@ class SimpleMediaDisplay:
             # Handle state change
             if desired_state != self.acc:
                 self.acc = desired_state
-                # Apply LED on state change if available
-                if led_available:
-                    self._update_led_color_for_state(self.acc)
-                    self._last_led_state_applied = self.acc
-                self._last_led_available = led_available
+                # Apply LED on every state change (safe no-op if hardware not ready)
+                self._update_led_color_for_state(self.acc)
                 if self.acc == SystemStates.IDLE and self.video_path:
                     if self.current_mode != "video":
                         self._open_video()
@@ -247,11 +242,12 @@ class SimpleMediaDisplay:
                     self.current_mode = "image"
                     self._needs_clear = True
             else:
-                # If hardware just became available, ensure LEDs get applied even without a state change
-                if led_available and (not self._last_led_available or self._last_led_state_applied != self.acc):
+                # No state change; periodically re-assert LED color in case hardware missed an update
+                now = time.time()
+                if now - self._last_led_apply_time > 2.0:
                     self._update_led_color_for_state(self.acc)
                     self._last_led_state_applied = self.acc
-                self._last_led_available = led_available
+                    self._last_led_apply_time = now
 
             # Render one frame
             if self.current_mode == "video" and self.video_cap is not None:
@@ -311,16 +307,6 @@ class SimpleMediaDisplay:
             # Nothing to clean per-tick
             pass
 
-    def _is_led_available(self) -> bool:
-        try:
-            from core.hardware_loop import get_hardware_loop
-            hardware_loop = get_hardware_loop()
-            if not hardware_loop or not hardware_loop.hardware:
-                return False
-            led_strip = hardware_loop.hardware.get_led_strip()
-            return led_strip is not None
-        except Exception:
-            return False
 
     def set_acc(self, value):
         """Set state and update display"""

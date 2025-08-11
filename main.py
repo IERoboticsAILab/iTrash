@@ -11,6 +11,7 @@ import threading
 from global_state import state
 from core.hardware_loop import start_hardware_loop, stop_hardware_loop
 from display.media_display import DisplayManager
+from api.server import start_api_server
 
 # Global variables for graceful shutdown
 hardware_loop = None
@@ -56,6 +57,13 @@ def main():
     except Exception as e:
         print(f"❌ Failed to start hardware loop: {e}")
         return
+
+    # Start monitoring API (non-critical)
+    try:
+        start_api_server()
+        print("✅ API server started at /classification/latest")
+    except Exception as e:
+        print(f"⚠️  API server not started: {e}")
     
     # Update state
     state.update("system_status", "running")

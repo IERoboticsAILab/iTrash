@@ -140,4 +140,9 @@ class AIConfig:
     If there are no object, the value will be "", but if there is an object, you are forced to choose among one of the 3 colors.
     '''
 
+class APIConfig:
+    # Lightweight monitoring API server config
+    HOST = "0.0.0.0"
+    PORT = 8080
+
  
