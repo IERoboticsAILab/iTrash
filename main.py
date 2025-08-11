@@ -65,15 +65,27 @@ def main():
     print("✅ System ready for object detection")
     print("\nPress Ctrl+C to stop the system")
     
-    # Main loop - keep the system running
+    # Main loop - keep the system running and drive display rendering
     try:
+        last_status = 0
         while is_running:
-            time.sleep(1)
+            # Drive display rendering from main thread for stability
+            if display_manager and display_manager.display:
+                try:
+                    display_manager.display.tick()
+                except Exception as e:
+                    # Keep running even if a render error occurs
+                    pass
             
-            # Optional: Print status every 30 seconds
-            if int(time.time()) % 30 == 0:
+            # Light-weight status every 10 seconds
+            now = time.time()
+            if now - last_status > 10:
+                last_status = now
                 current_phase = state.get("phase", "unknown")
                 print(f"System status: {current_phase}")
+            
+            # Target ~50 FPS for smooth video/images without high CPU
+            time.sleep(0.02)
                 
     except KeyboardInterrupt:
         print("\nSystem interrupted by user")

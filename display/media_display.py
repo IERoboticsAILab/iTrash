@@ -25,15 +25,20 @@ class SimpleMediaDisplay:
         self.screen_height = 1080
         self.image_mapping = DisplayConfig.IMAGE_MAPPING
         self.preloaded_images = {}
-        self.draw_lock = threading.Lock()
         self.display_initialized = False
         self.last_error_time = 0
         self.error_count = 0
         
-        # Idle video support
+        # Rendering state (single-thread, driven from main thread)
+        self.current_mode = "image"  # 'image' or 'video'
+        self._needs_clear = True
+        
+        # Idle video support (handled inside render loop only)
         self.video_path = self._resolve_idle_video_path()
-        self.video_thread = None
-        self.video_stop_event = threading.Event()
+        self.video_cap = None
+        self.video_fps = 30.0
+        self.video_delay = 1.0 / 30.0
+        self._last_video_ts = 0.0
         
         # Initialize display
         self._init_display()
@@ -120,63 +125,14 @@ class SimpleMediaDisplay:
 
     
     def show_image(self, state_number, force_recovery=False):
-        """Show image for given state number with optional force recovery"""
-        # If we're in idle state, video playback is responsible for drawing
-        if state_number == SystemStates.IDLE and self.video_path:
-            # Ensure video is running
-            if not self._is_video_playing():
-                self._start_idle_video()
-            return True
-        else:
-            # Stop video if we are leaving idle
-            self._stop_idle_video()
-        # Force recovery if requested
+        """Request showing a given state; actual drawing happens in render loop."""
         if force_recovery:
             if not self._recover_display(force=True):
                 return False
-        
-        if not self.screen or state_number not in self.image_mapping:
-            return False
-        
-        try:
-            # Use preloaded, pre-scaled surface if available
-            scaled_img, x, y = self._get_preloaded_surface(state_number)
-            if scaled_img is None:
-                return False
-            
-            # Display with error handling and draw lock to prevent interleaving with video
-            try:
-                with self.draw_lock:
-                    self.screen.fill((0, 0, 0))
-                    self.screen.blit(scaled_img, (x, y))
-                    pygame.display.flip()
-                return True
-                
-            except pygame.error as e:
-                if "GL context" in str(e) or "BadAccess" in str(e):
-                    if self._recover_display():
-                        # Retry once after recovery
-                        try:
-                            with self.draw_lock:
-                                self.screen.fill((0, 0, 0))
-                                self.screen.blit(scaled_img, (x, y))
-                                pygame.display.flip()
-                                return True
-                        except Exception as retry_e:
-                            return False
-                    else:
-                        return False
-                else:
-                    raise e
-            
-        except Exception as e:
-            # Try to recover from certain types of errors
-            if "GL context" in str(e) or "BadAccess" in str(e):
-                if self._recover_display():
-                    # Retry the operation
-                    return self.show_image(state_number)
-            
-            return False
+        if state_number in self.image_mapping:
+            self.acc = state_number
+            return True
+        return False
 
     def _preload_images(self):
         """Preload and scale images to memory for fast, seamless transitions."""
@@ -224,183 +180,146 @@ class SimpleMediaDisplay:
             pass
         return None
 
-    def _is_video_playing(self) -> bool:
-        return self.video_thread is not None and self.video_thread.is_alive()
-
-    def _start_idle_video(self):
-        """Start the idle video playback in a background thread."""
-        if not self.display_initialized or not self.video_path:
-            return
-        if self._is_video_playing():
-            return
-        self.video_stop_event.clear()
-        self.video_thread = threading.Thread(target=self._idle_video_loop, daemon=True)
-        self.video_thread.start()
-
-    def _stop_idle_video(self):
-        """Stop the idle video playback thread if running."""
-        if not self._is_video_playing():
-            return
-        self.video_stop_event.set()
-        try:
-            self.video_thread.join(timeout=1)
-        except Exception:
-            pass
-        self.video_thread = None
-
-    def _idle_video_loop(self):
-        """Continuously play the idle video while in IDLE state."""
-        cap = None
-        try:
+    def _open_video(self):
+        if not self.video_path or not self.display_initialized:
+            return False
+        if self.video_cap is None:
             cap = cv2.VideoCapture(self.video_path)
             if not cap.isOpened():
-                return
+                return False
             fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-            delay = max(1.0 / float(fps), 0.01)
-            
-            while self.is_running and not self.video_stop_event.is_set():
-                # If state changed from IDLE, exit
-                current_phase = state.get("phase", "idle")
-                if current_phase != "idle":
-                    break
-                
-                ok, frame = cap.read()
-                if not ok:
-                    # Loop back to start
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    continue
-                
-                # Convert BGR -> RGB
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                frame_height, frame_width = frame_rgb.shape[:2]
-                
-                # Scale to fit screen preserving aspect ratio
-                img_ratio = frame_width / frame_height
-                screen_ratio = self.screen_width / self.screen_height
-                if img_ratio > screen_ratio:
-                    new_width = self.screen_width
-                    new_height = int(self.screen_width / img_ratio)
-                else:
-                    new_height = self.screen_height
-                    new_width = int(self.screen_height * img_ratio)
-                
-                # Create pygame surface from image
-                try:
-                    surf = pygame.image.frombuffer(
-                        frame_rgb.tobytes(), (frame_width, frame_height), 'RGB'
-                    )
-                    surf = pygame.transform.scale(surf, (new_width, new_height))
-                    x = (self.screen_width - new_width) // 2
-                    y = (self.screen_height - new_height) // 2
-                    
-                    with self.draw_lock:
-                        self.screen.fill((0, 0, 0))
-                        self.screen.blit(surf, (x, y))
-                        pygame.display.flip()
-                except Exception:
-                    # If display error occurs, try recovery once
-                    if self._recover_display():
-                        continue
-                    else:
-                        break
-                
-                # Wait for the next frame or stop immediately when requested
-                if self.video_stop_event.wait(delay):
-                    break
-        finally:
+            self.video_cap = cap
+            self.video_fps = float(fps)
+            self.video_delay = max(1.0 / self.video_fps, 0.01)
+        return True
+
+    def _close_video(self):
+        if self.video_cap is not None:
             try:
-                if cap is not None:
-                    cap.release()
+                self.video_cap.release()
             except Exception:
                 pass
+            self.video_cap = None
+
+    def tick(self):
+        """Render one frame based on current global phase. Must be called from main thread."""
+        if not self.is_running or not self.display_initialized:
+            return
+        try:
+            # Determine desired state from global phase
+            current_phase = state.get("phase", "idle")
+            phase_to_state = {
+                "idle": SystemStates.IDLE,
+                "processing": SystemStates.PROCESSING,
+                "show_trash": SystemStates.SHOW_TRASH,
+                "user_confirmation": SystemStates.USER_CONFIRMATION,
+                "blue_trash": SystemStates.THROW_BLUE,
+                "yellow_trash": SystemStates.THROW_YELLOW,
+                "brown_trash": SystemStates.THROW_BROWN,
+                "success": SystemStates.SUCCESS,
+                "reward": SystemStates.REWARD,
+                "qrcode": SystemStates.QR_CODES,
+                "incorrect": SystemStates.INCORRECT,
+                "timeout": SystemStates.TIMEOUT,
+                "error": SystemStates.USER_CONFIRMATION,
+                "qr_codes": SystemStates.QR_CODES,
+            }
+            desired_state = phase_to_state.get(current_phase, SystemStates.IDLE)
+
+            # Handle state change
+            if desired_state != self.acc:
+                self.acc = desired_state
+                self._update_led_color_for_state(self.acc)
+                if self.acc == SystemStates.IDLE and self.video_path:
+                    if self.current_mode != "video":
+                        self._open_video()
+                        self.current_mode = "video"
+                        self._needs_clear = True
+                else:
+                    if self.current_mode == "video":
+                        self._close_video()
+                    self.current_mode = "image"
+                    self._needs_clear = True
+
+            # Render one frame
+            if self.current_mode == "video" and self.video_cap is not None:
+                now = time.time()
+                if now - self._last_video_ts < self.video_delay:
+                    return
+                ok, frame = self.video_cap.read()
+                if not ok:
+                    try:
+                        self.video_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        return
+                    except Exception:
+                        self._close_video()
+                        self._open_video()
+                        return
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                h, w = frame_rgb.shape[:2]
+                img_ratio = w / h
+                screen_ratio = self.screen_width / self.screen_height
+                if img_ratio > screen_ratio:
+                    new_w = self.screen_width
+                    new_h = int(self.screen_width / img_ratio)
+                else:
+                    new_h = self.screen_height
+                    new_w = int(self.screen_height * img_ratio)
+                try:
+                    surf = pygame.image.frombuffer(frame_rgb.tobytes(), (w, h), 'RGB')
+                    surf = pygame.transform.smoothscale(surf, (new_w, new_h))
+                    x = (self.screen_width - new_w) // 2
+                    y = (self.screen_height - new_h) // 2
+                    if self._needs_clear:
+                        self.screen.fill((0, 0, 0))
+                        self._needs_clear = False
+                    self.screen.blit(surf, (x, y))
+                    pygame.display.flip()
+                    pygame.event.pump()
+                    self._last_video_ts = now
+                except Exception:
+                    if self._recover_display():
+                        self._preload_images()
+                    return
+            else:
+                surf, x, y = self._get_preloaded_surface(self.acc)
+                if surf is not None:
+                    try:
+                        if self._needs_clear:
+                            self.screen.fill((0, 0, 0))
+                            self._needs_clear = False
+                        self.screen.blit(surf, (x, y))
+                        pygame.display.flip()
+                        pygame.event.pump()
+                    except Exception:
+                        if self._recover_display():
+                            self._preload_images()
+                        return
+        finally:
+            # Nothing to clean per-tick
+            pass
 
     def set_acc(self, value):
         """Set state and update display"""
         if value in self.image_mapping:
             self.acc = value
-            # For idle state, start video; for others, show static image
-            if value == SystemStates.IDLE and self.video_path:
-                self._start_idle_video()
-            else:
-                self._stop_idle_video()
-                self.show_image(value)
-            
             # Update LED color based on the new display state
             self._update_led_color_for_state(value)
     
     def monitor_state(self):
-        """Monitor state changes"""
-        # Ensure initial state is set
-        if self.acc == 0:
-            self.set_acc(SystemStates.IDLE)
-        
-        while self.is_running:
-            time.sleep(0.1)
-            
-            try:
-                current_phase = state.get("phase", "idle")
-                
-                # Map phase to state
-                phase_to_state = {
-                    "idle": SystemStates.IDLE,
-                    "processing": SystemStates.PROCESSING,
-                    "show_trash": SystemStates.SHOW_TRASH,
-                    "user_confirmation": SystemStates.USER_CONFIRMATION,
-                    "blue_trash": SystemStates.THROW_BLUE,
-                    "yellow_trash": SystemStates.THROW_YELLOW,
-                    "brown_trash": SystemStates.THROW_BROWN,
-                    "success": SystemStates.SUCCESS,
-                    "reward": SystemStates.REWARD,
-                    "qrcode": SystemStates.QR_CODES,
-                    "incorrect": SystemStates.INCORRECT,
-                    "timeout": SystemStates.TIMEOUT,
-                    "error": SystemStates.USER_CONFIRMATION,  # Show try_again_green.png on error
-                    "qr_codes": SystemStates.QR_CODES
-                }
-                
-                new_state = phase_to_state.get(current_phase, 0)
-                
-                if new_state != self.acc:
-                    # Update LED color based on new phase before changing display
-                    self._update_led_color(current_phase)
-                    self.set_acc(new_state)
-                    
-            except Exception as e:
-                print(f"Monitor error: {e}")
+        """Deprecated: state monitoring is handled in the render loop."""
+        pass
     
     def start(self):
         """Start the display system"""
-        if not self.display_initialized:
-            self.is_running = True
-            self.timer_thread = threading.Thread(target=self.monitor_state, daemon=True)
-            self.timer_thread.start()
-            return
-        
         self.is_running = True
-        
-        # Start monitoring first
-        self.timer_thread = threading.Thread(target=self.monitor_state, daemon=True)
-        self.timer_thread.start()
-        
-        # Small delay to ensure monitor is running
-        time.sleep(0.1)
-        
-        # Start with idle video if available; otherwise show idle image
-        if self.video_path:
-            self.set_acc(SystemStates.IDLE)
-        else:
-            self.show_image(SystemStates.IDLE)
-        
-        # Set initial LED color for idle state
+        # Initial LED color
         self._update_led_color_for_state(SystemStates.IDLE)
     
     def stop(self):
         """Stop the display system"""
         self.is_running = False
-        self._stop_idle_video()
-        
-        if self.timer_thread:
-            self.timer_thread.join(timeout=1)
+        self._close_video()
         
         if self.screen:
             try:
