@@ -15,7 +15,7 @@ from config.settings import APIConfig
 app = FastAPI(title="iTrash API", version="1.0.0")
 
 
-@app.get("/classification/latest")
+@app.get("/classification")
 def get_latest_classification():
     last = state.get("last_classification")
     return {
@@ -25,7 +25,7 @@ def get_latest_classification():
     }
 
 
-@app.get("/disposal/latest")
+@app.get("/disposal")
 def get_latest_disposal():
     disp = state.get("last_disposal") or {}
     return {
