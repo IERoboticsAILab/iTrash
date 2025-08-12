@@ -31,8 +31,8 @@ class HardwareConfig:
     # Proximity Sensor Pins
     DETECT_OBJECT_SENSOR_PIN = 26
     BLUE_PROXIMITY_PIN = 19
-    YELLOW_PROXIMITY_PIN = 13
-    BROWN_PROXIMITY_PIN = 6
+    YELLOW_PROXIMITY_PIN = 12
+    BROWN_PROXIMITY_PIN = 16
     
     # Camera Configuration - Raspberry Pi optimized
     CAMERA_INDEX = 0
