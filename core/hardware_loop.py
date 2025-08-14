@@ -19,9 +19,7 @@ from config.settings import TimingConfig, Colors
 
 class HardwareLoop:
     """Background hardware loop manager"""
-    
 
-    
     def __init__(self):
         self.is_running = False
         self.thread = None
@@ -32,7 +30,6 @@ class HardwareLoop:
         # Initialize components
         self._initialize_components()
     
-
     
     def _start_auto_reset(self, delay_seconds: int):
         """Start auto-reset timer to return to idle state"""

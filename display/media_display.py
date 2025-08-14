@@ -382,13 +382,6 @@ class SimpleMediaDisplay:
                     }
                     
                     color = phase_colors.get(phase, (0, 0, 0))
-                    # Idle/off should strictly clear without re-writing zeros
-                    if color == (0, 0, 0):
-                        # Extra-stable off: send two clear frames
-                        led_strip.clear_all()
-                        time.sleep(0.01)
-                        led_strip.clear_all()
-                        return
                     # Clear then set target color for a clean transition
                     led_strip.clear_all()
                     led_strip.set_color_all(color)
