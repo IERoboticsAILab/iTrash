@@ -9,6 +9,9 @@ iTrash solves the problem of improper waste sorting by guiding users to the corr
 - Project page: [cyphy.life/projects/itrash](https://cyphy.life/projects/itrash/)
 - Paper: [arXiv:2502.18161](https://arxiv.org/abs/2502.18161)
 
+### 🎥 Demo
+<img src="assets/itrash-demo.gif" alt="iTrash demo flow: show trash, classify, and dispose" width="600" />
+
 ### ✨ Features
 - **AI-powered classification**: Determines bin color (blue/yellow/brown) from the camera feed.
 - **Proximity object detection**: Detects items and validates thrown bin using GPIO sensors.
