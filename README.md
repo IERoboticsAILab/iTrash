@@ -5,6 +5,10 @@ An AI-driven smart trash can system that uses a camera, proximity sensors, LED s
 ### 🧭 Overview
 iTrash solves the problem of improper waste sorting by guiding users to the correct bin with visual feedback and a simple display interface. The system integrates sensors, a USB camera, an addressable LED strip, a pygame-based display, and a FastAPI monitoring API. The project is stable and currently used in lab settings, with small improvements planned. It supports running the end-to-end hardware loop on a Raspberry Pi.
 
+### 🔗 Project & Paper
+- Project page: [cyphy.life/projects/itrash](https://cyphy.life/projects/itrash/)
+- Paper: [arXiv:2502.18161](https://arxiv.org/abs/2502.18161)
+
 ### ✨ Features
 - **AI-powered classification**: Determines bin color (blue/yellow/brown) from the camera feed.
 - **Proximity object detection**: Detects items and validates thrown bin using GPIO sensors.
