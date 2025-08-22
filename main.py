@@ -60,8 +60,11 @@ def main():
 
     # Start monitoring API (non-critical)
     try:
-        start_api_server()
-        print("✅ API server started at /classification/latest")
+        api_thread = start_api_server()
+        if api_thread is not None:
+            print("✅ API server started. Endpoints: /classification, /disposal")
+        else:
+            print("⚠️  API server not started. Check uvicorn installation and port availability.")
     except Exception as e:
         print(f"⚠️  API server not started: {e}")
     
