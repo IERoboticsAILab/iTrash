@@ -150,12 +150,26 @@ class ClassificationManager:
         self.led_strip = led_strip
     
     async def process_image_with_feedback(self, image):
-        """Process image with LED feedback during classification"""
-        # Perform classification (run in thread to avoid blocking)
+        """Process image with LED feedback during classification
+
+        Retries classification up to 3 times if an invalid result is returned.
+        """
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, self.classifier.classify, image)
-        
-        return result
+
+        max_attempts = 3
+        for attempt_index in range(max_attempts):
+            result = await loop.run_in_executor(None, self.classifier.classify, image)
+
+            # Return immediately on valid classification
+            if result in TrashClassification.VALID_COLORS:
+                return result
+
+            # Optional small delay between attempts to avoid hammering the API
+            if attempt_index < max_attempts - 1:
+                await asyncio.sleep(0.5)
+
+        # All attempts failed; return empty to signal error handling upstream
+        return ""
     
     def get_classification_stats(self):
         """Get classification statistics"""
