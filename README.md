@@ -27,7 +27,8 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
 # Start the system (hardware + display + API)
-python main.py
+# Recommended on Raspberry Pi (GPIO/LED access requires root):
+sudo .venv/bin/python main.py
 ```
 
 ### ⚙️ Configuration
@@ -52,9 +53,11 @@ Key runtime settings are defined under:
 ### 🕹️ Usage
 - **Run the system (Raspberry Pi)**: Connect sensors, LED strip, camera, and display. Then run:
   ```bash
-  python main.py
+  sudo .venv/bin/python main.py
   ```
   This starts the display, background hardware loop, and the monitoring API.
+
+  If you encounter permission errors or LED/GPIO not responding, ensure you use `sudo` with the virtualenv interpreter as shown above.
 
 When `main.py` is running, the monitoring API is available at the configured host/port (default `http://localhost:8080`).
 
