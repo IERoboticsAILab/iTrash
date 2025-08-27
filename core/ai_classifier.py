@@ -109,7 +109,7 @@ class GPTClassifier:
                 "https://api.openai.com/v1/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=30
+                timeout=60
             )
             
             if response.status_code == 200:
