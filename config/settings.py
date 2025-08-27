@@ -119,8 +119,8 @@ class TimingConfig:
     PROCESSING_TO_RESULT_DELAY = 3    # seconds — after classification, before showing THROW_*
 
     # REWARD / QR codes
-    REWARD_DELAY = 2                  # seconds — before showing REWARD after correct bin
-    REWARD_DISPLAY_TIME = 5           # seconds — show REWARD
+    REWARD_DELAY = 0.5                  # seconds — before showing REWARD after correct bin
+    REWARD_DISPLAY_TIME = 4           # seconds — show REWARD
     QRCODE_DISPLAY_TIME = 5           # seconds — show QR codes before returning to IDLE
 
     # INCORRECT flow

@@ -4,14 +4,17 @@ Core state management for hardware loop and display communication.
 """
 
 import threading
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 class LocalState:
-    """Simple local state manager with thread safety"""
+    """Simple local state manager with thread safety.
+
+    Provides atomic update/get for a shared dictionary used across threads.
+    """
     
     def __init__(self):
         self._lock = threading.Lock()
-        self.state = {
+        self.state: Dict[str, Any] = {
             "phase": "idle",
             "last_classification": None,
             "last_classification_ts": None,
@@ -31,29 +34,29 @@ class LocalState:
         }
     
     def update(self, key: str, value: Any) -> None:
-        """Update a state value with thread safety"""
+        """Update a state value with thread safety."""
         with self._lock:
             self.state[key] = value
     
     def get(self, key: str, default: Any = None) -> Any:
-        """Get a state value with thread safety"""
+        """Get a state value with thread safety."""
         with self._lock:
             return self.state.get(key, default)
     
     def update_sensor_status(self, sensor: str, status: bool) -> None:
-        """Update sensor status"""
+        """Update sensor status atomically."""
         with self._lock:
             if "sensor_status" not in self.state:
                 self.state["sensor_status"] = {}
             self.state["sensor_status"][sensor] = status
     
     def get_sensor_status(self, sensor: str) -> bool:
-        """Get sensor status"""
+        """Get sensor status in a thread-safe manner."""
         with self._lock:
             return self.state.get("sensor_status", {}).get(sensor, False)
     
     def reset(self) -> None:
-        """Reset state to initial values"""
+        """Reset state to initial values atomically."""
         with self._lock:
             self.state = {
                 "phase": "idle",

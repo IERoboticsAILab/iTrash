@@ -5,8 +5,11 @@ Handles LED strip and proximity sensor operations.
 
 import time
 import RPi.GPIO as GPIO
-from rpi_ws281x import *
+import logging
+from rpi_ws281x import Adafruit_NeoPixel, Color
 from config.settings import HardwareConfig, Colors
+
+logger = logging.getLogger(__name__)
 
 class LEDStrip:
     """WS2812B LED strip controller"""
@@ -67,7 +70,7 @@ class ProximitySensors:
         # 0 --> object detected
         # 1 --> no object
         if state == 0:
-            print(f"Object Detected on pin {sensor_pin}")
+            logger.info("Object detected on pin %s", sensor_pin)
             return True
         else:
             return False

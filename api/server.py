@@ -8,11 +8,13 @@ Endpoints:
 from fastapi import FastAPI
 import threading
 from typing import Optional
+import logging
 
 from global_state import state
 from config.settings import APIConfig
 
 app = FastAPI(title="iTrash API", version="1.0.0")
+logger = logging.getLogger(__name__)
 
 
 @app.get("/classification")
@@ -55,7 +57,8 @@ def start_api_server() -> Optional[threading.Thread]:
         api_thread = threading.Thread(target=run_server, daemon=True)
         api_thread.start()
         return api_thread
-    except Exception:
+    except Exception as e:
+        logger.warning("API server could not be started: %s", e)
         return None
 
 

@@ -9,4 +9,4 @@ from api.state import LocalState
 state = LocalState()
 
 # Export for easy importing
-__all__ = ['state'] 
+__all__ = ['state']

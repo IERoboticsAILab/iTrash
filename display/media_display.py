@@ -9,8 +9,11 @@ import threading
 import pygame
 import cv2
 from pathlib import Path
+import logging
 from config.settings import DisplayConfig, SystemStates
 from global_state import state
+
+logger = logging.getLogger(__name__)
 
 class SimpleMediaDisplay:
     """Simple fullscreen display interface using Pygame"""
@@ -80,7 +83,7 @@ class SimpleMediaDisplay:
                     self.screen_width, self.screen_height = size
                     break
                 except Exception as e:
-                    print(f"Display mode {size} with flags {flags} failed: {e}")
+                    logger.warning("Display mode %s with flags %s failed: %s", size, flags, e)
                     continue
             
             if self.screen:
@@ -328,7 +331,7 @@ class SimpleMediaDisplay:
             try:
                 pygame.quit()
             except Exception as e:
-                pass
+                logger.debug("pygame.quit raised but was suppressed: %s", e)
     
     def _update_led_color(self, phase):
         """Update LED color based on current phase - synchronized with display images"""
@@ -394,7 +397,7 @@ class SimpleMediaDisplay:
                     led_strip.set_color_all(color)
         except Exception as e:
             # Silently fail if LED control is not available
-            pass
+            logger.debug("LED update suppressed: %s", e)
     
     def _update_led_color_for_state(self, state_value):
         """Update LED color based on display state value - synchronized with images"""
@@ -425,7 +428,7 @@ class SimpleMediaDisplay:
                         SystemStates.SUCCESS: (0, 255, 0),               # Green
                         
                         # State 5 - qr_codes.png
-                        SystemStates.QR_CODES: (0, 0, 255),              # Blue
+                        SystemStates.QR_CODES: (0, 255, 0),              # Blue
                         
                         # State 6 - reward_received_new.png
                         SystemStates.REWARD: (0, 255, 0),                # Green
@@ -459,7 +462,7 @@ class SimpleMediaDisplay:
                     led_strip.set_color_all(color)
         except Exception as e:
             # Silently fail if LED control is not available
-            pass
+            logger.debug("LED update suppressed: %s", e)
     
     def get_status(self):
         """Get status"""
@@ -485,7 +488,7 @@ class DisplayManager:
             self.display = SimpleMediaDisplay(images_dir)
             self.display.start()
         except Exception as e:
-            print(f"Display start error: {e}")
+            logger.exception("Display start error: %s", e)
     
     def stop_display(self):
         """Stop display"""
@@ -525,27 +528,27 @@ def show_state(state_number):
 
 def test_force_recovery():
     """Test the force recovery functionality"""
-    print("🔄 Testing Force Recovery Functionality")
+    logger.info("Testing Force Recovery Functionality")
     
     display = SimpleMediaDisplay()
     if not display.display_initialized:
-        print("❌ Display not initialized, cannot test recovery")
+        logger.warning("Display not initialized, cannot test recovery")
         return
     
-    print("✅ Display initialized, testing force recovery...")
+    logger.info("Display initialized, testing force recovery...")
     
     # Test 1: Force recovery
-    print("\n1️⃣ Testing force recovery...")
+    logger.info("Testing force recovery...")
     success = display.force_recovery()
-    print(f"   Force recovery result: {'✅ Success' if success else '❌ Failed'}")
+    logger.info("Force recovery result: %s", "Success" if success else "Failed")
     
     # Test 2: Show image with force recovery
-    print("\n2️⃣ Testing show image with force recovery...")
+    logger.info("Testing show image with force recovery...")
     success = display.show_image(0, force_recovery=True)
-    print(f"   Show with force recovery: {'✅ Success' if success else '❌ Failed'}")
+    logger.info("Show with force recovery: %s", "Success" if success else "Failed")
     
     display.stop()
-    print("\n✅ Force recovery test completed")
+    logger.info("Force recovery test completed")
 
 
 if __name__ == "__main__":
@@ -553,7 +556,7 @@ if __name__ == "__main__":
     test_force_recovery()
     
     # Simple test
-    print("\n🖼️  Running simple display test...")
+    logger.info("Running simple display test...")
     display = SimpleMediaDisplay()
     display.start()
     

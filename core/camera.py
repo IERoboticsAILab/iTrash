@@ -8,7 +8,11 @@ import numpy as np
 from PIL import Image
 import base64
 from io import BytesIO
+import logging
+from typing import Optional, Tuple
 from config.settings import HardwareConfig
+
+logger = logging.getLogger(__name__)
 
 class CameraController:
     """Camera controller for video capture and image processing"""
@@ -18,12 +22,12 @@ class CameraController:
         self.cap = None
         self.is_initialized = False
     
-    def initialize(self):
+    def initialize(self) -> bool:
         """Initialize the camera"""
         try:
             self.cap = cv2.VideoCapture(self.camera_index)
             if not self.cap.isOpened():
-                print(f"Error: Could not open camera at index {self.camera_index}")
+                logger.error("Could not open camera at index %s", self.camera_index)
                 return False
             
             # Set camera properties for Raspberry Pi
@@ -38,39 +42,39 @@ class CameraController:
             # Test camera by reading a frame
             ret, test_frame = self.cap.read()
             if not ret:
-                print("Error: Could not read test frame from camera")
+                logger.error("Could not read test frame from camera")
                 return False
             
             self.is_initialized = True
-            print("Camera initialized successfully")
-            print(f"Camera resolution: {HardwareConfig.FRAME_WIDTH}x{HardwareConfig.FRAME_HEIGHT}")
-            print(f"Camera FPS: {HardwareConfig.CAMERA_FPS}")
+            logger.info("Camera initialized successfully")
+            logger.info("Camera resolution: %sx%s", HardwareConfig.FRAME_WIDTH, HardwareConfig.FRAME_HEIGHT)
+            logger.info("Camera FPS: %s", HardwareConfig.CAMERA_FPS)
             return True
             
         except Exception as e:
-            print(f"Error initializing camera: {e}")
+            logger.exception("Error initializing camera: %s", e)
             return False
     
-    def read_frame(self):
+    def read_frame(self) -> Tuple[Optional[bool], Optional[np.ndarray]]:
         """Read a frame from the camera"""
         if not self.is_initialized or self.cap is None:
             return None, None
         
         ret, frame = self.cap.read()
         if not ret:
-            print("Error reading frame from camera")
+            logger.error("Error reading frame from camera")
             return None, None
         
         return ret, frame
     
-    def capture_image(self):
+    def capture_image(self) -> Optional[np.ndarray]:
         """Capture a single image from the camera"""
         ret, frame = self.read_frame()
         if ret:
             return frame
         return None
     
-    def encode_image_to_base64(self, image):
+    def encode_image_to_base64(self, image: np.ndarray) -> Optional[str]:
         """Convert OpenCV image to base64 string"""
         try:
             # Convert BGR to RGB
@@ -87,15 +91,15 @@ class CameraController:
             return base64_encoded
             
         except Exception as e:
-            print(f"Error encoding image to base64: {e}")
+            logger.exception("Error encoding image to base64: %s", e)
             return None
     
-    def release(self):
+    def release(self) -> None:
         """Release camera resources"""
         if self.cap is not None:
             self.cap.release()
             self.is_initialized = False
         
         cv2.destroyAllWindows()
-        print("Camera released")
+        logger.info("Camera released")
 

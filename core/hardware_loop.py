@@ -9,13 +9,16 @@ import asyncio
 from typing import Optional
 from datetime import datetime
 from zoneinfo import ZoneInfo
+import logging
 
 
 from global_state import state
 from core.hardware import HardwareController
 from core.camera import CameraController
 from core.ai_classifier import ClassificationManager
-from config.settings import TimingConfig, Colors
+from config.settings import TimingConfig
+
+logger = logging.getLogger(__name__)
 
 class HardwareLoop:
     """Background hardware loop manager"""
@@ -50,42 +53,41 @@ class HardwareLoop:
         # Initialize hardware
         try:
             self.hardware = HardwareController()
-            print("✅ Hardware controller initialized successfully")
+            logger.info("Hardware controller initialized successfully")
         except Exception as e:
-            print(f"❌ Error initializing hardware: {e}")
+            logger.exception("Error initializing hardware: %s", e)
             self.hardware = None
         
         # Initialize camera
         try:
             self.camera = CameraController()
             if not self.camera.initialize():
-                print("⚠️  Warning: Camera initialization failed")
+                logger.warning("Camera initialization failed")
                 self.camera = None
             else:
-                print("✅ Camera initialized successfully")
+                logger.info("Camera initialized successfully")
         except Exception as e:
-            print(f"❌ Error initializing camera: {e}")
+            logger.exception("Error initializing camera: %s", e)
             self.camera = None
         
         # Initialize classifier
         try:
             led_strip = self.hardware.get_led_strip() if self.hardware else None
             self.classifier = ClassificationManager(led_strip)
-            print("✅ Classifier initialized successfully")
+            logger.info("Classifier initialized successfully")
         except Exception as e:
-            print(f"❌ Error initializing classifier: {e}")
+            logger.exception("Error initializing classifier: %s", e)
             self.classifier = None
     
     def _hardware_loop(self):
         """Main hardware loop"""
         if not self.hardware:
-            print("❌ Hardware not available, exiting hardware loop")
+            logger.error("Hardware not available, exiting hardware loop")
             return
         
-        print("🔄 Hardware loop started - monitoring for objects...")
+        logger.info("Hardware loop started - monitoring for objects...")
         
         proximity_sensors = self.hardware.get_proximity_sensors()
-        led_strip = self.hardware.get_led_strip()
         
         # Initial delay
         time.sleep(TimingConfig.OBJECT_DETECTION_DELAY)
@@ -119,7 +121,7 @@ class HardwareLoop:
                 time.sleep(0.1)
                 
             except Exception as e:
-                print(f"Error in hardware loop: {e}")
+                logger.exception("Error in hardware loop: %s", e)
                 time.sleep(1)
     
     def _check_bin_sensors(self, proximity_sensors):
@@ -148,7 +150,6 @@ class HardwareLoop:
     def _handle_bin_detection(self, bin_type: str):
         """Handle bin detection"""
         current_phase = state.get("phase")
-        last_classification = state.get("last_classification")
         
         # Check if we're in one of the trash-specific phases
         trash_phases = ["blue_trash", "yellow_trash", "brown_trash"]
@@ -167,7 +168,6 @@ class HardwareLoop:
                 # Correct bin!
                 state.update("reward", True)
                 # Record disposal event
-                from datetime import datetime
                 state.update("last_disposal", {
                     "user_thrown": bin_type,
                     "timestamp": datetime.now(ZoneInfo("Europe/Madrid")),
@@ -183,22 +183,18 @@ class HardwareLoop:
                 
                 # Start QR code phase after reward
                 def qrcode_auto_reset():
-                    import time
                     time.sleep(TimingConfig.REWARD_DISPLAY_TIME)
                     state.update("phase", "qrcode")
                     
                     # Auto-reset to idle after QR code display time
                     def final_reset():
-                        import time
                         time.sleep(TimingConfig.QRCODE_DISPLAY_TIME)
                         state.update("phase", "idle")
                     
-                    import threading
                     final_reset_thread = threading.Thread(target=final_reset, daemon=True)
                     final_reset_thread.start()
                 
                 # Start QR code phase in separate thread
-                import threading
                 qrcode_thread = threading.Thread(target=qrcode_auto_reset, daemon=True)
                 qrcode_thread.start()
                 
@@ -206,7 +202,6 @@ class HardwareLoop:
                 # Wrong bin
                 state.update("phase", "incorrect")
                 # Record disposal event as incorrect
-                from datetime import datetime
                 state.update("last_disposal", {
                     "user_thrown": bin_type,
                     "timestamp": datetime.now(ZoneInfo("Europe/Madrid")),
@@ -221,7 +216,7 @@ class HardwareLoop:
     def _process_trash_detection(self):
         """Process trash detection and classification"""
         if not self.camera or not self.classifier:
-            print("Camera or classifier not available")
+            logger.error("Camera or classifier not available")
             state.update("phase", "error")
             return
         
@@ -229,7 +224,7 @@ class HardwareLoop:
             # Capture image
             frame = self.camera.capture_image()
             if frame is None:
-                print("Failed to capture image")
+                logger.error("Failed to capture image")
                 state.update("phase", "error")
                 return
             
@@ -263,6 +258,7 @@ class HardwareLoop:
                         self._start_auto_reset(5)
                         
                 except Exception as e:
+                    logger.exception("Error during classification thread: %s", e)
                     state.update("phase", "error")
                     self._start_auto_reset(5)
                 finally:
@@ -281,6 +277,7 @@ class HardwareLoop:
                 self._start_auto_reset(5)
             
         except Exception as e:
+            logger.exception("Unhandled error during trash detection: %s", e)
             state.update("phase", "error")
             self._start_auto_reset(5)
     
@@ -303,15 +300,15 @@ class HardwareLoop:
         if self.hardware:
             try:
                 self.hardware.cleanup()
-            except:
-                pass
+            except Exception:
+                logger.debug("Hardware cleanup raised but was suppressed")
         
         # Release camera
         if self.camera:
             try:
                 self.camera.release()
-            except:
-                pass
+            except Exception:
+                logger.debug("Camera release raised but was suppressed")
 
 # Global hardware loop instance
 hardware_loop: Optional[HardwareLoop] = None

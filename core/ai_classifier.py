@@ -5,9 +5,13 @@ Handles YOLO and GPT-based trash classification.
 
 import asyncio
 import json
+import logging
+from typing import Any, Dict
 import requests
 from inference_sdk import InferenceHTTPClient
 from config.settings import AIConfig, TrashClassification, OPENAI_API_KEY, YOLO_API_KEY
+
+logger = logging.getLogger(__name__)
 
 class YOLOClassifier:
     """YOLO-based trash classifier"""
@@ -18,7 +22,7 @@ class YOLOClassifier:
             api_key=YOLO_API_KEY
         )
     
-    def classify(self, image):
+    def classify(self, image: Any) -> str:
         """Classify trash using YOLO model"""
         try:
             result = self.client.infer(image, model_id=AIConfig.YOLO_MODEL_ID)
@@ -26,17 +30,17 @@ class YOLOClassifier:
             if result["predictions"]:
                 # Get prediction with highest confidence
                 max_pred = max(result["predictions"], key=lambda x: x["confidence"])
-                print(f"YOLO Prediction: {max_pred}")
+                logger.info("YOLO Prediction: %s", max_pred)
                 
                 # Map class to color
                 trash_class = TrashClassification.TRASH_DICT.get(max_pred['class'], "")
                 return trash_class
             else:
-                print("No objects detected by YOLO")
+                logger.info("No objects detected by YOLO")
                 return ""
                 
         except Exception as e:
-            print(f"Error in YOLO classification: {e}")
+            logger.exception("Error in YOLO classification: %s", e)
             return ""
 
 
@@ -49,7 +53,7 @@ class GPTClassifier:
         self.max_tokens = AIConfig.GPT_MAX_TOKENS
         self.prompt = AIConfig.GPT_PROMPT
     
-    def _encode_image_to_base64(self, image):
+    def _encode_image_to_base64(self, image: Any) -> str:
         """Convert image to base64 for GPT API"""
         import base64
         import cv2
@@ -69,7 +73,7 @@ class GPTClassifier:
         
         return base64_encoded
     
-    def classify(self, image):
+    def classify(self, image: Any) -> str:
         """Classify trash using GPT-4 Vision - single attempt only"""
         try:
             base64_image = self._encode_image_to_base64(image)
@@ -119,37 +123,37 @@ class GPTClassifier:
                     
                     # Validate color
                     if trash_class in TrashClassification.VALID_COLORS:
-                        print(f"GPT Classification: {trash_class}")
+                        logger.info("GPT Classification: %s", trash_class)
                         return trash_class
                     else:
-                        print(f"GPT Response: {content}")
-                        print(f"Invalid color returned by GPT: {trash_class}")
+                        logger.warning("GPT Response (unexpected): %s", content)
+                        logger.warning("Invalid color returned by GPT: %s", trash_class)
                         return ""
                         
                 except json.JSONDecodeError:
-                    print(f"Invalid JSON response from GPT: {content}")
+                    logger.warning("Invalid JSON response from GPT: %s", content)
                     return ""
                     
             else:
-                print(f"GPT API error: {response.status_code} - {response.text}")
+                logger.warning("GPT API error: %s - %s", response.status_code, response.text)
                 return ""
                 
         except Exception as e:
-            print(f"Error in GPT classification: {e}")
+            logger.exception("Error in GPT classification: %s", e)
             return ""
 
 class ClassificationManager:
     """Manages the classification process with LED feedback"""
     
-    def __init__(self, led_strip=None):
+    def __init__(self, led_strip: Any = None):
         self.classifier = GPTClassifier()
         self.led_strip = led_strip
     
-    def set_led_strip(self, led_strip):
+    def set_led_strip(self, led_strip: Any) -> None:
         """Set LED strip for visual feedback"""
         self.led_strip = led_strip
     
-    async def process_image_with_feedback(self, image):
+    async def process_image_with_feedback(self, image: Any) -> str:
         """Process image with LED feedback during classification
 
         Retries classification up to 3 times if an invalid result is returned.
@@ -171,7 +175,7 @@ class ClassificationManager:
         # All attempts failed; return empty to signal error handling upstream
         return ""
     
-    def get_classification_stats(self):
+    def get_classification_stats(self) -> Dict[str, Any]:
         """Get classification statistics"""
         # This could be expanded to track accuracy, response times, etc.
         return {
@@ -183,19 +187,19 @@ class ClassificationManager:
 
 
 # Utility functions for backward compatibility
-def apply_yolo(image):
+def apply_yolo(image: Any) -> str:
     """Legacy function for YOLO classification"""
     classifier = YOLOClassifier()
     return classifier.classify(image)
 
 
-def apply_gpt(image):
+def apply_gpt(image: Any) -> str:
     """Legacy function for GPT classification"""
     classifier = GPTClassifier()
     return classifier.classify(image)
 
 
-async def process_image(image, led_strip):
+async def process_image(image: Any, led_strip: Any) -> str:
     """Legacy async function for image processing"""
     manager = ClassificationManager(led_strip)
     return await manager.process_image_with_feedback(image) 
