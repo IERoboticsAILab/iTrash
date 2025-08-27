@@ -35,7 +35,7 @@ class HardwareConfig:
     BROWN_PROXIMITY_PIN = 16
     
     # Camera Configuration - Raspberry Pi optimized
-    CAMERA_INDEX = 0
+    CAMERA_INDEX = -1
     FRAME_WIDTH = 640
     FRAME_HEIGHT = 480
     # Raspberry Pi camera specific settings
@@ -131,12 +131,12 @@ class AIConfig:
     YOLO_MODEL_ID = "garbage-classification-3/2"
     YOLO_API_URL = "https://detect.roboflow.com"
     GPT_MODEL = "gpt-4o-mini"
-    GPT_MAX_TOKENS = 50
+    GPT_MAX_TOKENS = 100
     
     # GPT Prompt for trash classification
     GPT_PROMPT = '''Im going to give you an image and you have to tell me in which bin I should throw the trash. 
-    You can choose among 3 different colors of the bin I should throw it: blue ( cardboard and paper), yellow (platic and metal) and brown(organic).  
-    You will return just a diccionary, with "trash_class" as the key, and the color you choose as the value.(e.g. {"trash_class":<color>}). 
+    You can choose among 3 different colors of the bin I should throw it: blue (cardboard and paper), yellow (platic and metal) and brown(organic).  
+    You will return just a dictionary, with "trash_class" as the key, and the color you choose as the value.(e.g. {"trash_class":<color>}). 
     If there are no object, the value will be "", but if there is an object, you are forced to choose among one of the 3 colors.
     '''
 
