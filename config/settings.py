@@ -131,7 +131,7 @@ class AIConfig:
     YOLO_MODEL_ID = "garbage-classification-3/2"
     YOLO_API_URL = "https://detect.roboflow.com"
     GPT_MODEL = "gpt-4o-mini"
-    GPT_MAX_TOKENS = 100
+    GPT_MAX_TOKENS = 50
     
     # GPT Prompt for trash classification
     GPT_PROMPT = '''Im going to give you an image and you have to tell me in which bin I should throw the trash. 

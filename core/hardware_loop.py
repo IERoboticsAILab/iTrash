@@ -254,6 +254,8 @@ class HardwareLoop:
                             state.update("phase", "brown_trash")
                     else:
                         # Classification failed or invalid result - show try_again_green
+                        state.update("last_classification", "")
+                        state.update("last_classification_ts", None)
                         state.update("phase", "error")
                         self._start_auto_reset(5)
                         
@@ -273,11 +275,15 @@ class HardwareLoop:
             
             # If thread is still alive after timeout, show try_again_green
             if classify_thread.is_alive():
+                state.update("last_classification", "")
+                state.update("last_classification_ts", None)
                 state.update("phase", "error")
                 self._start_auto_reset(5)
             
         except Exception as e:
             logger.exception("Unhandled error during trash detection: %s", e)
+            state.update("last_classification", "")
+            state.update("last_classification_ts", None)
             state.update("phase", "error")
             self._start_auto_reset(5)
     

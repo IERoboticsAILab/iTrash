@@ -22,7 +22,7 @@ def get_latest_classification():
     last = state.get("last_classification")
     return {
         "id": "",  # reserved
-        "last_classification" : last if last != "" else "error",
+        "last_classification": last if last not in (None, "") else "error",
         "timestamp": state.get("last_classification_ts"),
     }
 

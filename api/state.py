@@ -37,6 +37,10 @@ class LocalState:
         """Update a state value with thread safety."""
         with self._lock:
             self.state[key] = value
+            # When transitioning back to idle, clear last classification data
+            if key == "phase" and value == "idle":
+                self.state["last_classification"] = None
+                self.state["last_classification_ts"] = None
     
     def get(self, key: str, default: Any = None) -> Any:
         """Get a state value with thread safety."""
