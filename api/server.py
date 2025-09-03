@@ -20,9 +20,14 @@ logger = logging.getLogger(__name__)
 @app.get("/classification")
 def get_latest_classification():
     last = state.get("last_classification")
+    phase = state.get("phase")
+    if phase == "idle":
+        last_value = None
+    else:
+        last_value = last if last not in (None, "") else "error"
     return {
         "id": "",  # reserved
-        "last_classification": last if last not in (None, "") else "error",
+        "last_classification": last_value,
         "timestamp": state.get("last_classification_ts"),
     }
 
