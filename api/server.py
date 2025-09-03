@@ -32,9 +32,9 @@ def get_latest_disposal():
     disp = state.get("last_disposal") or {}
     return {
         "id": "",  # reserved
-        "user_thrown": disp.get("user_thrown"),
+        "user_thrown": disp.get("user_thrown") if disp.get("user_thrown") not in (None, "") else "error",
         "timestamp": disp.get("timestamp"),
-        "correct": disp.get("correct"),
+        "correct": disp.get("correct") if disp.get("correct") is not None else "error",
     }
 
 

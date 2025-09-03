@@ -45,6 +45,10 @@ class HardwareConfig:
     CAMERA_FPS = 30
     CAMERA_BUFFER_SIZE = 1
 
+    # Image capture storage
+    IMAGE_SAVE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "captured_images")
+    IMAGE_FORMAT = "jpg"  # jpg or png
+
 # LED Colors
 class Colors:
     EMPTY = (0, 0, 0)

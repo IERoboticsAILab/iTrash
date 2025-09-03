@@ -11,6 +11,8 @@ from io import BytesIO
 import logging
 from typing import Optional, Tuple
 from config.settings import HardwareConfig
+import os
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +73,21 @@ class CameraController:
         """Capture a single image from the camera"""
         ret, frame = self.read_frame()
         if ret:
+            # Save image to disk
+            try:
+                save_dir = HardwareConfig.IMAGE_SAVE_DIR
+                os.makedirs(save_dir, exist_ok=True)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                filename = f"frame_{timestamp}.{HardwareConfig.IMAGE_FORMAT}"
+                path = os.path.join(save_dir, filename)
+                # Encode and save using OpenCV
+                if HardwareConfig.IMAGE_FORMAT.lower() == "png":
+                    cv2.imwrite(path, frame, [int(cv2.IMWRITE_PNG_COMPRESSION), 3])
+                else:
+                    cv2.imwrite(path, frame, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
+                logger.info("Saved captured image: %s", path)
+            except Exception as e:
+                logger.warning("Could not save captured image: %s", e)
             return frame
         return None
     
