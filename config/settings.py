@@ -34,6 +34,9 @@ class HardwareConfig:
     YELLOW_PROXIMITY_PIN = 12
     BROWN_PROXIMITY_PIN = 16
     
+    # Debounce / stability requirements (milliseconds)
+    DETECTION_HOLD_MS = 50
+    
     # Camera Configuration - Raspberry Pi optimized
     CAMERA_INDEX = -1
     FRAME_WIDTH = 640

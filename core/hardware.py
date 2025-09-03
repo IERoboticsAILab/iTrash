@@ -64,16 +64,26 @@ class ProximitySensors:
         GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
         return pin
     
+    def _stable_high_for_ms(self, sensor_pin, hold_ms):
+        """Return True only if the pin stays LOW (active) continuously for hold_ms."""
+        start = time.time()
+        hold_s = hold_ms / 1000.0
+        while True:
+            state = GPIO.input(sensor_pin)
+            # Active low: 0 means object present. If we ever see HIGH (1), abort.
+            if state != 0:
+                return False
+            if (time.time() - start) >= hold_s:
+                return True
+            # Small sleep to reduce CPU; 1 ms granularity
+            time.sleep(0.001)
+
     def detect_object(self, sensor_pin):
-        """Detect if an object is present on the specified sensor"""
-        state = GPIO.input(sensor_pin)
-        # 0 --> object detected
-        # 1 --> no object
-        if state == 0:
-            logger.info("Object detected on pin %s", sensor_pin)
+        """Detect if an object is present on the specified sensor with debounce."""
+        if self._stable_high_for_ms(sensor_pin, HardwareConfig.DETECTION_HOLD_MS):
+            logger.info("Object detected on pin %s (debounced %sms)", sensor_pin, HardwareConfig.DETECTION_HOLD_MS)
             return True
-        else:
-            return False
+        return False
     
     def detect_object_proximity(self):
         """Detect object on the main object detection sensor"""
