@@ -74,7 +74,7 @@ class GPTClassifier:
         return base64_encoded
     
     def classify(self, image: Any) -> str:
-        """Classify trash using GPT-4 Vision - single attempt only"""
+        """Classify trash using GPT vision - single attempt only"""
         try:
             base64_image = self._encode_image_to_base64(image)
             
@@ -85,28 +85,27 @@ class GPTClassifier:
             
             payload = {
                 "model": self.model,
-                "messages": [
+                "input": [
                     {
                         "role": "user",
                         "content": [
                             {
-                                "type": "text",
+                                "type": "input_text",
                                 "text": self.prompt
                             },
                             {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{base64_image}"
-                                }
+                                "type": "input_image",
+                                "image_url": f"data:image/jpeg;base64,{base64_image}"
                             }
                         ]
                     }
                 ],
-                "max_tokens": self.max_tokens
+                "max_output_tokens": self.max_tokens,
+                "reasoning": {"effort": "low"}
             }
             
             response = requests.post(
-                "https://api.openai.com/v1/chat/completions",
+                "https://api.openai.com/v1/responses",
                 headers=headers,
                 json=payload,
                 timeout=60
@@ -114,7 +113,14 @@ class GPTClassifier:
             
             if response.status_code == 200:
                 result = response.json()
-                content = result['choices'][0]['message']['content']
+                content = (
+                    result.get("output", [{}])[0]
+                    .get("content", [{}])[0]
+                    .get("text", "")
+                )
+
+                if not content:
+                    content = result.get("output_text", "")
                 
                 # Parse JSON response
                 try:
