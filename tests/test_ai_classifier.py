@@ -7,7 +7,7 @@ inference_sdk_stub = types.ModuleType("inference_sdk")
 inference_sdk_stub.InferenceHTTPClient = object
 sys.modules.setdefault("inference_sdk", inference_sdk_stub)
 
-from core.ai_classifier import GPTClassifier
+from core.ai_classifier import ClassificationManager, GPTClassifier
 
 
 class FakeResponse:
@@ -39,6 +39,24 @@ def _make_classifier(api_key: str = "test-key") -> GPTClassifier:
 
 
 class GPTClassifierResponsesTest(unittest.TestCase):
+    def test_default_reasoning_effort_is_low(self):
+        classifier = GPTClassifier()
+
+        self.assertEqual(classifier.reasoning_effort, "low")
+
+    def test_prompt_is_short_and_contains_bin_rules(self):
+        classifier = GPTClassifier()
+
+        self.assertLess(len(classifier.prompt), 500)
+        self.assertIn("blue", classifier.prompt)
+        self.assertIn("paper", classifier.prompt)
+        self.assertIn("cardboard", classifier.prompt)
+        self.assertIn("yellow", classifier.prompt)
+        self.assertIn("plastic", classifier.prompt)
+        self.assertIn("metal", classifier.prompt)
+        self.assertIn("brown", classifier.prompt)
+        self.assertIn("organic", classifier.prompt)
+
     def test_classify_uses_responses_api_and_parses_output_text(self):
         classifier = _make_classifier()
 
@@ -175,6 +193,23 @@ class GPTClassifierResponsesTest(unittest.TestCase):
             any("OPENAI_API_KEY" in message for message in logs.output),
             logs.output,
         )
+
+    def test_manager_does_not_retry_empty_classification(self):
+        manager = ClassificationManager()
+        calls = []
+
+        def fake_classify(image):
+            calls.append(image)
+            return ""
+
+        manager.classifier.classify = fake_classify
+
+        import asyncio
+
+        result = asyncio.run(manager.process_image_with_feedback(image=object()))
+
+        self.assertEqual(result, "")
+        self.assertEqual(len(calls), 1)
 
 
 if __name__ == "__main__":

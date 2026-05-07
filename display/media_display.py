@@ -11,6 +11,7 @@ import cv2
 from pathlib import Path
 import logging
 from config.settings import DisplayConfig, SystemStates
+from core.feedback import LEDFeedback
 from global_state import state
 
 logger = logging.getLogger(__name__)
@@ -338,63 +339,29 @@ class SimpleMediaDisplay:
         try:
             # Import here to avoid circular imports
             from core.hardware_loop import get_hardware_loop
+            from config.settings import SystemStates
             
             hardware_loop = get_hardware_loop()
             if hardware_loop and hardware_loop.hardware:
                 led_strip = hardware_loop.hardware.get_led_strip()
                 if led_strip:
-                    # Map phases to LED colors - synchronized with display images
-                    phase_colors = {
-                        # Idle state - white.png
-                        "idle": (0, 0, 0),                    # Off (clean white screen)
-                        
-                        # Processing state - processing_new.png
-                        "processing": (255, 255, 255),        # White (processing indicator)
-                        
-                        # Show trash state - show_trash.png
-                        "show_trash": (255, 255, 255),        # White (show trash indicator)
-                        
-                        # User confirmation state - try_again_green.png (error case)
-                        "user_confirmation": (255, 0, 0),     # Red (error indicator)
-                        
-                        # Success state - great_job.png
-                        "success": (0, 255, 0),               # Green (success indicator)
-                        
-                        # QR codes state - qr_codes.png
-                        "qr_codes": (0, 0, 255),              # Blue (QR code indicator)
-                        
-                        # QR code phase - qr_codes.png (LEDs off)
-                        "qrcode": (0, 0, 0),                  # Off (QR code display)
-                        
-                        # Reward state - reward_received_new.png
-                        "reward": (0, 255, 0),                # Green (reward indicator)
-                        
-                        # Incorrect state - incorrect_new.png
-                        "incorrect": (255, 0, 0),             # Red (incorrect indicator)
-                        
-                        # Timeout state - timeout_new.png
-                        "timeout": (255, 0, 0),               # Red (timeout indicator)
-                        
-                        # Trash-specific states
-                        "blue_trash": (0, 0, 255),            # Blue (throw_blue.png)
-                        "yellow_trash": (255, 255, 0),        # Yellow (throw_yellow.png)
-                        "brown_trash": (139, 69, 19),         # Brown (throw_brown.png)
-                        
-                        # Error state - try_again_green.png
-                        "error": (255, 0, 0),                 # Red (error indicator)
+                    phase_to_state = {
+                        "idle": SystemStates.IDLE,
+                        "processing": SystemStates.PROCESSING,
+                        "show_trash": SystemStates.SHOW_TRASH,
+                        "user_confirmation": SystemStates.USER_CONFIRMATION,
+                        "success": SystemStates.SUCCESS,
+                        "qr_codes": SystemStates.QR_CODES,
+                        "qrcode": SystemStates.QR_CODES,
+                        "reward": SystemStates.REWARD,
+                        "incorrect": SystemStates.INCORRECT,
+                        "timeout": SystemStates.TIMEOUT,
+                        "blue_trash": SystemStates.THROW_BLUE,
+                        "yellow_trash": SystemStates.THROW_YELLOW,
+                        "brown_trash": SystemStates.THROW_BROWN,
+                        "error": SystemStates.USER_CONFIRMATION,
                     }
-                    
-                    color = phase_colors.get(phase, (0, 0, 0))
-                    # Idle/off should strictly clear without re-writing zeros
-                    if color == (0, 0, 0):
-                        # Extra-stable off: send two clear frames
-                        led_strip.clear_all()
-                        time.sleep(0.01)
-                        led_strip.clear_all()
-                        return
-                    # Clear then set target color for a clean transition
-                    led_strip.clear_all()
-                    led_strip.set_color_all(color)
+                    LEDFeedback(led_strip).set_state(phase_to_state.get(phase, SystemStates.IDLE))
         except Exception as e:
             # Silently fail if LED control is not available
             logger.debug("LED update suppressed: %s", e)
@@ -410,56 +377,7 @@ class SimpleMediaDisplay:
             if hardware_loop and hardware_loop.hardware:
                 led_strip = hardware_loop.hardware.get_led_strip()
                 if led_strip:
-                    # Map display states to LED colors - synchronized with images
-                    state_colors = {
-                        # State 0 - white.png (idle)
-                        SystemStates.IDLE: (0, 0, 0),                    # Off
-                        
-                        # State 1 - processing_new.png
-                        SystemStates.PROCESSING: (255, 255, 255),        # White
-                        
-                        # State 2 - show_trash.png
-                        SystemStates.SHOW_TRASH: (255, 255, 255),        # White
-                        
-                        # State 3 - try_again_green.png (error/retry)
-                        SystemStates.USER_CONFIRMATION: (255, 0, 0),     # Red
-                        
-                        # State 4 - great_job.png (success)
-                        SystemStates.SUCCESS: (0, 255, 0),               # Green
-                        
-                        # State 5 - qr_codes.png
-                        SystemStates.QR_CODES: (0, 255, 0),              # Blue
-                        
-                        # State 6 - reward_received_new.png
-                        SystemStates.REWARD: (0, 255, 0),                # Green
-                        
-                        # State 7 - incorrect_new.png
-                        SystemStates.INCORRECT: (255, 0, 0),             # Red
-                        
-                        # State 8 - timeout_new.png
-                        SystemStates.TIMEOUT: (255, 0, 0),               # Red
-                        
-                        # State 9 - throw_yellow.png
-                        SystemStates.THROW_YELLOW: (255, 255, 0),        # Yellow
-                        
-                        # State 10 - throw_blue.png
-                        SystemStates.THROW_BLUE: (0, 0, 255),            # Blue
-                        
-                        # State 11 - throw_brown.png
-                        SystemStates.THROW_BROWN: (139, 69, 19),         # Brown
-                    }
-                    
-                    color = state_colors.get(state_value, (0, 0, 0))
-                    # Idle/off should strictly clear without re-writing zeros
-                    if color == (0, 0, 0):
-                        # Extra-stable off: send two clear frames
-                        led_strip.clear_all()
-                        time.sleep(0.01)
-                        led_strip.clear_all()
-                        return
-                    # Clear then set target color for a clean transition
-                    led_strip.clear_all()
-                    led_strip.set_color_all(color)
+                    LEDFeedback(led_strip).set_state(state_value)
         except Exception as e:
             # Silently fail if LED control is not available
             logger.debug("LED update suppressed: %s", e)
@@ -568,6 +486,3 @@ if __name__ == "__main__":
         pass
     finally:
         display.stop()
-
-
- 

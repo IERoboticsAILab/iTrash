@@ -11,3 +11,6 @@ venv/
 *.pyo
 
 *.swp
+
+# Debug camera captures
+captured_images/

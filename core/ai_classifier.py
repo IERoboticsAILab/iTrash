@@ -76,11 +76,7 @@ class GPTClassifier:
         self._session = requests.Session()
 
     def _encode_image_to_base64(self, image: Any) -> str:
-        """Convert image to a downscaled base64 JPEG suitable for the API.
-
-        Resizing keeps the longest edge at 512px, which is plenty for
-        classification while dramatically reducing bandwidth and latency.
-        """
+        """Convert a preprocessed OpenCV image to a base64 JPEG."""
         import base64
         import cv2
         from PIL import Image
@@ -88,7 +84,6 @@ class GPTClassifier:
 
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image_pil = Image.fromarray(image_rgb)
-        image_pil.thumbnail((512, 512))
 
         image_stream = BytesIO()
         image_pil.save(image_stream, format="JPEG", quality=80)
@@ -292,20 +287,13 @@ class ClassificationManager:
     async def process_image_with_feedback(self, image: Any) -> str:
         """Process image with LED feedback during classification.
 
-        Retries classification up to 3 times if an invalid result is returned.
-        Uses ``asyncio.to_thread`` so the blocking HTTP call doesn't stall the
-        event loop and avoids the deprecated ``get_event_loop`` API.
+        The classifier owns API-level retries. An empty model result means
+        either no visible object or a handled failure, so this manager does not
+        repeat the same image blindly.
         """
-        max_attempts = 3
-        for attempt_index in range(max_attempts):
-            result = await asyncio.to_thread(self.classifier.classify, image)
-
-            if result in TrashClassification.VALID_COLORS:
-                return result
-
-            if attempt_index < max_attempts - 1:
-                await asyncio.sleep(0.5)
-
+        result = await asyncio.to_thread(self.classifier.classify, image)
+        if result in TrashClassification.VALID_COLORS:
+            return result
         return ""
     
     def get_classification_stats(self) -> Dict[str, Any]:
@@ -335,4 +323,4 @@ def apply_gpt(image: Any) -> str:
 async def process_image(image: Any, led_strip: Any) -> str:
     """Legacy async function for image processing"""
     manager = ClassificationManager(led_strip)
-    return await manager.process_image_with_feedback(image) 
+    return await manager.process_image_with_feedback(image)

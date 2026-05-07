@@ -48,6 +48,18 @@ class HardwareConfig:
     # Image capture storage
     IMAGE_SAVE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "captured_images")
     IMAGE_FORMAT = "jpg"  # jpg or png
+    CAPTURE_DEBUG_SAVE_ENABLED = os.getenv("CAPTURE_DEBUG_SAVE_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
+
+    # Capture preparation / classifier image preprocessing
+    STALE_FRAME_FLUSH_COUNT = int(os.getenv("STALE_FRAME_FLUSH_COUNT", "5"))
+    CLASSIFIER_IMAGE_LONG_EDGE = int(os.getenv("CLASSIFIER_IMAGE_LONG_EDGE", "512"))
+
+    # Disabled by default until the physical presentation area is measured.
+    CROP_ENABLED = os.getenv("CROP_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
+    CROP_X = int(os.getenv("CROP_X", "0"))
+    CROP_Y = int(os.getenv("CROP_Y", "0"))
+    CROP_WIDTH = int(os.getenv("CROP_WIDTH", "0"))
+    CROP_HEIGHT = int(os.getenv("CROP_HEIGHT", "0"))
 
 # LED Colors
 class Colors:
@@ -120,7 +132,6 @@ class TimingConfig:
 
     # IDLE/detection
     OBJECT_DETECTION_DELAY = 0.5      # seconds — initial delay before object detection starts
-    IDLE_TO_PROCESSING_DELAY = 0.5    # seconds — after object detected, before PROCESSING
 
     # PROCESSING/classification
     PROCESSING_TO_RESULT_DELAY = 3    # seconds — after classification, before showing THROW_*
@@ -143,32 +154,18 @@ class AIConfig:
     # and the small JSON answer.
     GPT_MAX_TOKENS = 2048
     # Reasoning effort for GPT-5 family. Valid: "low" | "medium" | "high".
-    GPT_REASONING_EFFORT = "medium"
+    GPT_REASONING_EFFORT = "low"
     
     # GPT Prompt for trash classification
-    GPT_PROMPT = '''You will be given an image. Your task is to determine which recycling bin the trash in the image should be thrown into, based on its material. 
-
-    The recycling bins are organized by the following colors and materials:
-    - blue: for cardboard and paper items only 
-    - yellow: for plastic and metal items only 
-    - brown: for organic waste and biodegradable items only
-
-    Carefully analyze the objects in the image. If there is a visible object, you must choose exactly one color from blue, yellow, or brown that most closely matches the trash type based on the materials described above. If multiple items are present, select the bin corresponding to the most prominent or largest piece, prioritizing according to the list above.
-
-    Return your answer ONLY as a JSON dictionary with the key "trash_class", and the assigned color as the value, like this: {"trash_class":"yellow"}. Do not include any explanation, commentary, or additional text.
-
-    If there is no object or the image is empty, return {"trash_class":""}.
-
-    Use this mapping strictly:
-    - Only "blue", "yellow", or "brown" are valid values for "trash_class" (except for an empty bin, which is ""). 
-    - "blue" is for paper/cardboard, "yellow" is for plastic/metal, "brown" is for organic waste.
-
-    Choose the color that best fits the object, even if it is ambiguous. You must always choose one (unless there is clearly nothing in the image).
-    '''
+    GPT_PROMPT = (
+        'Classify the main visible trash item into a recycling bin. '
+        'Return only JSON matching the schema. '
+        'Use "blue" for paper or cardboard, "yellow" for plastic or metal, '
+        'and "brown" for organic or biodegradable waste. '
+        'If no trash item is visible, use an empty string.'
+    )
 
 class APIConfig:
     # Lightweight monitoring API server config
     HOST = "0.0.0.0"
     PORT = 8080
-
- 

@@ -16,6 +16,7 @@ from global_state import state
 from core.hardware import HardwareController
 from core.camera import CameraController
 from core.ai_classifier import ClassificationManager
+from core.feedback import LEDFeedback
 from config.settings import TimingConfig
 
 logger = logging.getLogger(__name__)
@@ -104,9 +105,6 @@ class HardwareLoop:
                 # Only check for object detection if we're in idle phase
                 # This prevents re-detection while processing or waiting for user confirmation
                 if current_phase == "idle" and proximity_sensors.detect_object_proximity():
-                    # Add delay before processing
-                    time.sleep(TimingConfig.IDLE_TO_PROCESSING_DELAY)
-                    
                     # Update state
                     state.update("phase", "processing")
                     state.update_sensor_status("object_detected", True)
@@ -221,8 +219,8 @@ class HardwareLoop:
             return
         
         try:
-            # Capture image
-            frame = self.camera.capture_image()
+            # Countdown, flush stale camera frames, then capture the final frame.
+            frame = self._prepare_capture()
             if frame is None:
                 logger.error("Failed to capture image")
                 state.update("phase", "error")
@@ -230,6 +228,7 @@ class HardwareLoop:
             
             # Classify trash (run in thread to avoid blocking)
             def classify_async():
+                loop = None
                 try:
                     # Run classification in event loop
                     loop = asyncio.new_event_loop()
@@ -264,7 +263,8 @@ class HardwareLoop:
                     state.update("phase", "error")
                     self._start_auto_reset(5)
                 finally:
-                    loop.close()
+                    if loop is not None:
+                        loop.close()
             
             # Start classification in separate thread with timeout
             classify_thread = threading.Thread(target=classify_async, daemon=True)
@@ -286,6 +286,28 @@ class HardwareLoop:
             state.update("last_classification_ts", None)
             state.update("phase", "error")
             self._start_auto_reset(5)
+
+    def _prepare_capture(self):
+        """Blink a capture countdown while flushing stale frames, then capture."""
+        led_strip = self.hardware.get_led_strip() if self.hardware else None
+        feedback = LEDFeedback(led_strip)
+
+        flush_thread = None
+        if self.camera:
+            flush_thread = threading.Thread(target=self.camera.flush_stale_frames, daemon=True)
+
+        def start_flush():
+            if flush_thread:
+                flush_thread.start()
+
+        feedback.blink_capture_countdown(on_started=start_flush)
+
+        if flush_thread:
+            flush_thread.join()
+
+        if not self.camera:
+            return None
+        return self.camera.capture_for_classification()
     
     def start(self):
         """Start the hardware loop"""
@@ -335,4 +357,4 @@ def stop_hardware_loop():
 
 def get_hardware_loop() -> Optional[HardwareLoop]:
     """Get the hardware loop instance"""
-    return hardware_loop 
+    return hardware_loop
