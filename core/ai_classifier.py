@@ -72,6 +72,16 @@ class GPTClassifier:
         base64_encoded = base64.b64encode(image_stream.getvalue()).decode('utf-8')
         
         return base64_encoded
+
+    def _extract_response_text(self, result: Dict[str, Any]) -> str:
+        """Extract text from OpenAI Responses output items."""
+        for output_item in result.get("output", []):
+            for content_item in output_item.get("content", []):
+                text = content_item.get("text", "")
+                if text:
+                    return text
+
+        return result.get("output_text", "")
     
     def classify(self, image: Any) -> str:
         """Classify trash using GPT vision - single attempt only"""
@@ -113,14 +123,12 @@ class GPTClassifier:
             
             if response.status_code == 200:
                 result = response.json()
-                content = (
-                    result.get("output", [{}])[0]
-                    .get("content", [{}])[0]
-                    .get("text", "")
-                )
+                content = self._extract_response_text(result)
 
-                if not content:
-                    content = result.get("output_text", "")
+                if content:
+                    logger.info("GPT response text: %s", content)
+                else:
+                    logger.warning("GPT raw response: %s", json.dumps(result, ensure_ascii=False))
                 
                 # Parse JSON response
                 try:
@@ -138,6 +146,7 @@ class GPTClassifier:
                         
                 except json.JSONDecodeError:
                     logger.warning("Invalid JSON response from GPT: %s", content)
+                    logger.warning("GPT raw response: %s", json.dumps(result, ensure_ascii=False))
                     return ""
                     
             else:

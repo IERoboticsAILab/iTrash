@@ -14,8 +14,8 @@ class FakeResponse:
     status_code = 200
     text = ""
 
-    def json(self):
-        return {
+    def __init__(self, payload=None):
+        self.payload = payload or {
             "output": [
                 {
                     "content": [
@@ -24,6 +24,9 @@ class FakeResponse:
                 }
             ]
         }
+
+    def json(self):
+        return self.payload
 
 
 class GPTClassifierResponsesTest(unittest.TestCase):
@@ -62,6 +65,48 @@ class GPTClassifierResponsesTest(unittest.TestCase):
                     "image_url": "data:image/jpeg;base64,encoded-image",
                 },
             ],
+        )
+
+    def test_classify_parses_text_from_later_response_output_items(self):
+        classifier = GPTClassifier()
+        response_payload = {
+            "output": [
+                {"type": "reasoning", "summary": []},
+                {
+                    "type": "message",
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": '{"trash_class":"brown"}',
+                        }
+                    ],
+                },
+            ]
+        }
+
+        with (
+            patch.object(classifier, "_encode_image_to_base64", return_value="encoded-image"),
+            patch("core.ai_classifier.requests.post", return_value=FakeResponse(response_payload)),
+        ):
+            result = classifier.classify(image=object())
+
+        self.assertEqual(result, "brown")
+
+    def test_classify_logs_raw_response_when_text_is_empty(self):
+        classifier = GPTClassifier()
+        response_payload = {"output": [{"type": "reasoning", "summary": []}]}
+
+        with (
+            patch.object(classifier, "_encode_image_to_base64", return_value="encoded-image"),
+            patch("core.ai_classifier.requests.post", return_value=FakeResponse(response_payload)),
+            self.assertLogs("core.ai_classifier", level="WARNING") as logs,
+        ):
+            result = classifier.classify(image=object())
+
+        self.assertEqual(result, "")
+        self.assertTrue(
+            any("GPT raw response" in message for message in logs.output),
+            logs.output,
         )
 
 
