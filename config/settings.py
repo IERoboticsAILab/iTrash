@@ -137,14 +137,28 @@ class TimingConfig:
 class AIConfig:
     YOLO_MODEL_ID = "garbage-classification-3/2"
     YOLO_API_URL = "https://detect.roboflow.com"
-    GPT_MODEL = "gpt-4o-mini"
+    GPT_MODEL = "gpt-5-nano"
     GPT_MAX_TOKENS = 50
     
     # GPT Prompt for trash classification
-    GPT_PROMPT = '''Im going to give you an image and you have to tell me in which bin I should throw the trash. 
-    You can choose among 3 different colors of the bin I should throw it: blue (cardboard and paper), yellow (platic and metal) and brown(organic).  
-    You will return just a dictionary, with "trash_class" as the key, and the color you choose as the value.(e.g. {"trash_class":<color>}). 
-    If there are no object, the value will be "", but if there is an object, you are forced to choose among one of the 3 colors.
+    GPT_PROMPT = '''You will be given an image. Your task is to determine which recycling bin the trash in the image should be thrown into, based on its material. 
+
+    The recycling bins are organized by the following colors and materials:
+    - blue: for cardboard and paper items only 
+    - yellow: for plastic and metal items only 
+    - brown: for organic waste and biodegradable items only
+
+    Carefully analyze the objects in the image. If there is a visible object, you must choose exactly one color from blue, yellow, or brown that most closely matches the trash type based on the materials described above. If multiple items are present, select the bin corresponding to the most prominent or largest piece, prioritizing according to the list above.
+
+    Return your answer ONLY as a JSON dictionary with the key "trash_class", and the assigned color as the value, like this: {"trash_class":"yellow"}. Do not include any explanation, commentary, or additional text.
+
+    If there is no object or the image is empty, return {"trash_class":""}.
+
+    Use this mapping strictly:
+    - Only "blue", "yellow", or "brown" are valid values for "trash_class" (except for an empty bin, which is ""). 
+    - "blue" is for paper/cardboard, "yellow" is for plastic/metal, "brown" is for organic waste.
+
+    Choose the color that best fits the object, even if it is ambiguous. You must always choose one (unless there is clearly nothing in the image).
     '''
 
 class APIConfig:
