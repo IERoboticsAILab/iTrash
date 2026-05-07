@@ -138,7 +138,12 @@ class AIConfig:
     YOLO_MODEL_ID = "garbage-classification-3/2"
     YOLO_API_URL = "https://detect.roboflow.com"
     GPT_MODEL = "gpt-5.4-nano"
-    GPT_MAX_TOKENS = 50
+    # On the Responses API for reasoning models, this budget covers reasoning
+    # tokens too, so it must be generous enough for both the chain of thought
+    # and the small JSON answer.
+    GPT_MAX_TOKENS = 2048
+    # Reasoning effort for GPT-5 family. Valid: "minimal" | "low" | "medium" | "high".
+    GPT_REASONING_EFFORT = "minimal"
     
     # GPT Prompt for trash classification
     GPT_PROMPT = '''You will be given an image. Your task is to determine which recycling bin the trash in the image should be thrown into, based on its material. 
