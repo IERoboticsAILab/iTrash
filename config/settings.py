@@ -137,7 +137,7 @@ class TimingConfig:
 class AIConfig:
     YOLO_MODEL_ID = "garbage-classification-3/2"
     YOLO_API_URL = "https://detect.roboflow.com"
-    GPT_MODEL = "gpt-5-nano"
+    GPT_MODEL = "gpt-5.4-nano"
     GPT_MAX_TOKENS = 50
     
     # GPT Prompt for trash classification
