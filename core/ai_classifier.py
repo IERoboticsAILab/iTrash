@@ -73,6 +73,8 @@ class GPTClassifier:
         self.max_tokens = AIConfig.GPT_MAX_TOKENS
         self.reasoning_effort = getattr(AIConfig, "GPT_REASONING_EFFORT", "minimal")
         self.prompt = AIConfig.GPT_PROMPT
+        self.url = _OPENAI_RESPONSES_URL
+        self.timeout = 60
         self._session = requests.Session()
 
     def _encode_image_to_base64(self, image: Any) -> str:
@@ -169,10 +171,10 @@ class GPTClassifier:
         for attempt in range(_MAX_HTTP_ATTEMPTS):
             try:
                 response = self._session.post(
-                    _OPENAI_RESPONSES_URL,
+                    self.url,
                     headers=headers,
                     json=payload,
-                    timeout=60,
+                    timeout=self.timeout,
                 )
             except (requests.ConnectionError, requests.Timeout) as exc:
                 logger.warning(
@@ -278,11 +280,98 @@ class GPTClassifier:
         logger.warning("Unexpected trash_class value from GPT: %r", trash_class)
         return ""
 
+class SmolVLMClassifier(GPTClassifier):
+    """Local SmolVLM2 classifier served by llama.cpp's ``llama-server``.
+
+    llama-server exposes an OpenAI-compatible ``/v1/chat/completions`` endpoint
+    that accepts base64 image_url parts, so everything GPTClassifier already
+    does -- image downscaling, session reuse, retry/backoff, result validation
+    -- is inherited unchanged. Only the request body and the location of the
+    reply text differ.
+
+    Structured output is enforced server-side: llama.cpp compiles the JSON
+    schema into a GBNF grammar, so a 500M model physically cannot emit a
+    ``trash_class`` outside the enum. That guarantee is what makes a model
+    this small usable here at all.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.url = AIConfig.LLAMA_SERVER_URL
+        self.model = AIConfig.SMOLVLM_MODEL
+        self.prompt = AIConfig.SMOLVLM_PROMPT
+        self.max_tokens = AIConfig.SMOLVLM_MAX_TOKENS
+        self.timeout = AIConfig.SMOLVLM_TIMEOUT
+        # llama-server ignores auth, but the inherited classify() refuses to
+        # send when api_key is falsy. A placeholder keeps that guard honest.
+        self.api_key = "local"
+
+    def _build_payload(self, base64_image: str) -> Dict[str, Any]:
+        """Chat Completions body with a grammar-constrained JSON schema."""
+        return {
+            "model": self.model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": self.prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            },
+                        },
+                    ],
+                }
+            ],
+            "max_tokens": self.max_tokens,
+            # Greedy decoding: this is a classification, not a creative task.
+            "temperature": 0.0,
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "trash_classification",
+                    "strict": True,
+                    "schema": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "trash_class": {
+                                "type": "string",
+                                "enum": self._ALLOWED_VALUES,
+                            }
+                        },
+                        "required": ["trash_class"],
+                    },
+                },
+            },
+        }
+
+    def _extract_response_text(self, result: Dict[str, Any]) -> str:
+        """Pull the reply out of a Chat Completions payload."""
+        choices = result.get("choices") or []
+        if not choices:
+            return ""
+        return (choices[0].get("message") or {}).get("content") or ""
+
+
+def _build_classifier() -> GPTClassifier:
+    """Pick the classifier backend named by ``AIConfig.BACKEND``."""
+    backend = getattr(AIConfig, "BACKEND", "gpt").lower()
+    if backend == "smolvlm":
+        logger.info("Using local SmolVLM backend at %s", AIConfig.LLAMA_SERVER_URL)
+        return SmolVLMClassifier()
+    if backend != "gpt":
+        logger.warning("Unknown AI backend %r, falling back to gpt", backend)
+    logger.info("Using OpenAI GPT backend (%s)", AIConfig.GPT_MODEL)
+    return GPTClassifier()
+
+
 class ClassificationManager:
     """Manages the classification process with LED feedback"""
-    
+
     def __init__(self, led_strip: Any = None):
-        self.classifier = GPTClassifier()
+        self.classifier = _build_classifier()
         self.led_strip = led_strip
     
     def set_led_strip(self, led_strip: Any) -> None:

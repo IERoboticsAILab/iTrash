@@ -7,7 +7,7 @@ inference_sdk_stub = types.ModuleType("inference_sdk")
 inference_sdk_stub.InferenceHTTPClient = object
 sys.modules.setdefault("inference_sdk", inference_sdk_stub)
 
-from core.ai_classifier import GPTClassifier
+from core.ai_classifier import GPTClassifier, SmolVLMClassifier
 
 
 class FakeResponse:
@@ -175,6 +175,72 @@ class GPTClassifierResponsesTest(unittest.TestCase):
             any("OPENAI_API_KEY" in message for message in logs.output),
             logs.output,
         )
+
+
+class SmolVLMClassifierTest(unittest.TestCase):
+    """The local backend must speak Chat Completions, not the Responses API."""
+
+    @staticmethod
+    def _chat_response(text='{"trash_class":"blue"}'):
+        return FakeResponse({"choices": [{"message": {"content": text}}]})
+
+    def test_classify_posts_chat_completions_with_image_and_schema(self):
+        classifier = SmolVLMClassifier()
+        captured = {}
+
+        def fake_post(url, headers, json, timeout):
+            captured["url"] = url
+            captured["json"] = json
+            captured["timeout"] = timeout
+            return self._chat_response()
+
+        with (
+            patch.object(classifier, "_encode_image_to_base64", return_value="img"),
+            patch.object(classifier._session, "post", side_effect=fake_post),
+        ):
+            result = classifier.classify(image=object())
+
+        self.assertEqual(result, "blue")
+        self.assertTrue(captured["url"].endswith("/v1/chat/completions"))
+        self.assertEqual(captured["timeout"], classifier.timeout)
+
+        payload = captured["json"]
+        self.assertEqual(payload["temperature"], 0.0)
+        self.assertNotIn("reasoning", payload)  # local model is not a reasoner
+        self.assertEqual(payload["response_format"]["type"], "json_schema")
+        schema = payload["response_format"]["json_schema"]
+        self.assertTrue(schema["strict"])
+        self.assertEqual(
+            schema["schema"]["properties"]["trash_class"]["enum"],
+            ["blue", "yellow", "brown", ""],
+        )
+        self.assertEqual(
+            payload["messages"][0]["content"][1],
+            {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,img"}},
+        )
+
+    def test_classify_returns_empty_when_no_choices(self):
+        classifier = SmolVLMClassifier()
+
+        with (
+            patch.object(classifier, "_encode_image_to_base64", return_value="img"),
+            patch.object(classifier._session, "post", return_value=FakeResponse({"choices": []})),
+            self.assertLogs("core.ai_classifier", level="WARNING") as logs,
+        ):
+            result = classifier.classify(image=object())
+
+        self.assertEqual(result, "")
+        self.assertTrue(any("no text" in m for m in logs.output), logs.output)
+
+    def test_missing_api_key_guard_does_not_block_local_backend(self):
+        """OPENAI_API_KEY is irrelevant offline; the inherited guard must not fire."""
+        classifier = SmolVLMClassifier()
+
+        with (
+            patch.object(classifier, "_encode_image_to_base64", return_value="img"),
+            patch.object(classifier._session, "post", return_value=self._chat_response()),
+        ):
+            self.assertEqual(classifier.classify(image=object()), "blue")
 
 
 if __name__ == "__main__":

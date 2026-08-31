@@ -6,8 +6,15 @@ venv/
 .env
 
 # Python cache
-*/__pycache__/
+__pycache__/
 *.pyc
 *.pyo
 
+# Camera captures - core/camera.py writes one per detection and never prunes
+captured_images/
+
+# Local model weights (llama.cpp caches to ~/.cache, but don't risk a 437MB commit)
+*.gguf
+
+.DS_Store
 *.swp

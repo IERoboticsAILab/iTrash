@@ -135,6 +135,10 @@ class TimingConfig:
 
 # AI Configuration
 class AIConfig:
+    # Which classifier backend to use: "gpt" (OpenAI, needs network) or
+    # "smolvlm" (local llama-server, fully offline). Override with AI_BACKEND.
+    BACKEND = os.getenv("AI_BACKEND", "gpt")
+
     YOLO_MODEL_ID = "garbage-classification-3/2"
     YOLO_API_URL = "https://detect.roboflow.com"
     GPT_MODEL = "gpt-5.4-nano"
@@ -160,11 +164,36 @@ class AIConfig:
     If there is no object or the image is empty, return {"trash_class":""}.
 
     Use this mapping strictly:
-    - Only "blue", "yellow", or "brown" are valid values for "trash_class" (except for an empty bin, which is ""). 
+    - Only "blue", "yellow", or "brown" are valid values for "trash_class" (except for an empty bin, which is "").
     - "blue" is for paper/cardboard, "yellow" is for plastic/metal, "brown" is for organic waste.
 
     Choose the color that best fits the object, even if it is ambiguous. You must always choose one (unless there is clearly nothing in the image).
     '''
+
+    # --- Local SmolVLM2 backend (llama.cpp llama-server) ---
+    # Served by scripts/setup_smolvlm.sh. Chat Completions, not Responses.
+    LLAMA_SERVER_URL = os.getenv(
+        "LLAMA_SERVER_URL", "http://127.0.0.1:8081/v1/chat/completions"
+    )
+    # llama-server serves whatever model it was launched with and ignores this
+    # field; it exists only because the OpenAI wire format requires it.
+    SMOLVLM_MODEL = "smolvlm"
+    # The reply is ~10 tokens of JSON and the grammar forbids anything else.
+    SMOLVLM_MAX_TOKENS = 32
+    # A Pi 4 has no dotprod/i8mm, so image prefill dominates. Generous, but
+    # still under the hardware loop's 30s classify_thread timeout.
+    SMOLVLM_TIMEOUT = 25
+
+    # Deliberately far shorter than GPT_PROMPT: a 500M model degrades badly on
+    # long instructions, and the JSON schema is enforced by grammar anyway, so
+    # the prompt does not need to beg for the output format.
+    SMOLVLM_PROMPT = (
+        "Which recycling bin does the object in this image belong in?\n"
+        "blue = paper, cardboard\n"
+        "yellow = plastic, metal\n"
+        "brown = food scraps, organic waste\n"
+        "If the image shows no object, answer with an empty string."
+    )
 
 class APIConfig:
     # Lightweight monitoring API server config
