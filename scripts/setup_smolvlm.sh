@@ -60,14 +60,14 @@ cmake -S "$LLAMA_DIR" -B "$LLAMA_DIR/build" \
   -DGGML_NATIVE=ON
 cmake --build "$LLAMA_DIR/build" -j"$(nproc)" --target llama-server llama-mtmd-cli
 
-echo "==> Downloading $MODEL_REPO ($MODEL_QUANT) + vision projector"
-# -hf pulls BOTH the text model and its mmproj automatically. Cached under
-# ~/.cache/llama.cpp, so this is a no-op on re-runs.
-"$LLAMA_DIR/build/bin/llama-mtmd-cli" \
-  -hf "$MODEL_REPO:$MODEL_QUANT" --no-warmup -p "warmup" --image /dev/null 2>/dev/null || true
-
 echo
 echo "==> Build complete."
-echo "    Start the server:  $0 serve"
-echo "    Then smoke test:   ./scripts/smoke_smolvlm.py <image.jpg>"
-echo "    Run iTrash local:  AI_BACKEND=smolvlm sudo -E .venv/bin/python main.py"
+echo
+echo "    Next:  $0 serve"
+echo
+echo "    The first 'serve' downloads ~440MB (weights + vision projector) into"
+echo "    ~/.cache/llama.cpp before it starts listening. Later runs start instantly."
+echo "    Run it as your normal user, NOT with sudo, or the cache lands in /root."
+echo
+echo "    Then, in a second shell:  ./scripts/smoke_smolvlm.py"
+echo "    Then, to run iTrash:      AI_BACKEND=smolvlm sudo -E .venv/bin/python main.py"
