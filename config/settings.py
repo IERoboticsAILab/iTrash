@@ -202,7 +202,7 @@ class AIConfig:
     CNN_LABELS_PATH = os.getenv("CNN_LABELS_PATH", "models/trash_cnn.json")
     # Below this softmax confidence the frame is treated as "no confident bin"
     # (returns ""), which the hardware loop surfaces as the error phase.
-    CNN_MIN_CONFIDENCE = float(os.getenv("CNN_MIN_CONFIDENCE", "0.45"))
+    CNN_MIN_CONFIDENCE = float(os.getenv("CNN_MIN_CONFIDENCE", "0.6"))
 
 class APIConfig:
     # Lightweight monitoring API server config
