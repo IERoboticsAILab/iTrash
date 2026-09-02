@@ -22,8 +22,11 @@ if [ ! -x "$TRAIN_VENV/bin/python" ]; then
   echo "==> Creating training venv (one-time; installs torch, ~200MB)"
   python3 -m venv "$TRAIN_VENV"
   "$TRAIN_VENV/bin/pip" install -q --upgrade pip
-  "$TRAIN_VENV/bin/pip" install -q torch torchvision onnx onnxscript pillow python-dotenv
+  "$TRAIN_VENV/bin/pip" install -q torch torchvision onnx onnxscript pillow python-dotenv huggingface_hub
 fi
+
+echo "==> 0/5 Ensuring external pretrain dataset is present"
+"$TRAIN_VENV/bin/python" "$REPO/scripts/fetch_external.py"
 
 echo "==> 1/5 Labeling captures on $PI (GPT is the teacher)"
 ssh "$PI" "cd ~/$PI_REPO && .venv/bin/python scripts/label_captures.py"

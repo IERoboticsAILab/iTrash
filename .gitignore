@@ -22,3 +22,6 @@ models/
 *.swp
 # Local training venv for scripts/retrain.sh
 .venv-train/
+
+# External pretrain dataset (fetched by scripts/fetch_external.py)
+external_data/
