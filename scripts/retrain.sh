@@ -41,14 +41,14 @@ echo "==> 4/5 Deploying model to $PI"
 scp -q "$REPO/models/trash_cnn.onnx" "$REPO/models/trash_cnn.json" "$PI:~/$PI_REPO/models/"
 
 if [ "$RESTART" = "1" ]; then
-  echo "==> 5/5 Restarting kiosk on AI_BACKEND=cnn"
-  # [m]ain.py bracket-trick so pkill doesn't match this very command line.
-  ssh "$PI" "cd ~/$PI_REPO && sudo pkill -f '[m]ain.py' 2>/dev/null; sleep 2; \
-    setsid sudo AI_BACKEND=cnn DISPLAY=:0 XAUTHORITY=/home/pi/.Xauthority \
-    .venv/bin/python main.py >~/itrash_cnn.log 2>&1 </dev/null & \
-    sleep 10; grep -E 'Loaded CNN|System ready|Error|Traceback' ~/itrash_cnn.log | tail -5"
+  echo "==> 5/5 Restarting kiosk (systemd) to pick up the new model"
+  # The kiosk runs as the itrash.service unit (see scripts/itrash.service), so a
+  # restart is a clean systemctl call -- no fragile background-ssh detach.
+  ssh "$PI" "sudo systemctl restart itrash.service && sleep 10 && \
+    echo active=\$(systemctl is-active itrash.service) && \
+    sudo journalctl -u itrash.service -n 5 --no-pager | grep -E 'Loaded CNN|System ready|Error|Traceback'"
 else
-  echo "==> 5/5 Skipped restart (RESTART=0). On the Pi, relaunch main.py with AI_BACKEND=cnn."
+  echo "==> 5/5 Skipped restart (RESTART=0). On the Pi: sudo systemctl restart itrash.service"
 fi
 
 echo "==> Done. Review the confusion matrix above; brown improves as organic captures grow."

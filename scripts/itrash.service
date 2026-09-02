@@ -1,0 +1,25 @@
+[Unit]
+# iTrash kiosk as a managed service. Install on the Pi:
+#   sudo cp scripts/itrash.service /etc/systemd/system/itrash.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now itrash.service
+# Runs as root for GPIO/LED DMA, on the physical display (:0). Survives SSH
+# disconnects and reboots, and auto-restarts on crash -- unlike a backgrounded
+# ssh launch, which dies when the session closes.
+Description=iTrash smart bin kiosk
+After=graphical.target
+Wants=graphical.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/pi/iTrash
+Environment=AI_BACKEND=cnn
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/pi/.Xauthority
+ExecStart=/home/pi/iTrash/.venv/bin/python main.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=graphical.target
