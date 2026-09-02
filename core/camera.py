@@ -64,9 +64,17 @@ class CameraController:
         
         ret, frame = self.cap.read()
         if not ret:
-            logger.error("Error reading frame from camera")
-            return None, None
-        
+            # USB webcams drop out (device node vanishes, errno 19). One
+            # release+reopen recovers it without a whole-service restart;
+            # a permanently-gone camera just fails again and the caller resets.
+            logger.warning("Frame read failed; attempting camera reconnect")
+            self.release()
+            if self.initialize():
+                ret, frame = self.cap.read()
+            if not ret:
+                logger.error("Error reading frame from camera (after reconnect)")
+                return None, None
+
         return ret, frame
     
     def capture_image(self) -> Optional[np.ndarray]:

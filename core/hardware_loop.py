@@ -218,14 +218,16 @@ class HardwareLoop:
         if not self.camera or not self.classifier:
             logger.error("Camera or classifier not available")
             state.update("phase", "error")
+            self._start_auto_reset(5)
             return
-        
+
         try:
             # Capture image
             frame = self.camera.capture_image()
             if frame is None:
                 logger.error("Failed to capture image")
                 state.update("phase", "error")
+                self._start_auto_reset(5)
                 return
             
             # Classify trash (run in thread to avoid blocking)
