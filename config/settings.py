@@ -195,6 +195,15 @@ class AIConfig:
         "If the image shows no object, answer with an empty string."
     )
 
+    # "cnn" backend: local MobileNetV3 (ONNX) fine-tuned on kiosk captures.
+    # Fully offline, ~100-300ms on a Pi 4 CPU. Model + labels are produced by
+    # scripts/train_cnn.py and are gitignored (see models/).
+    CNN_MODEL_PATH = os.getenv("CNN_MODEL_PATH", "models/trash_cnn.onnx")
+    CNN_LABELS_PATH = os.getenv("CNN_LABELS_PATH", "models/trash_cnn.json")
+    # Below this softmax confidence the frame is treated as "no confident bin"
+    # (returns ""), which the hardware loop surfaces as the error phase.
+    CNN_MIN_CONFIDENCE = float(os.getenv("CNN_MIN_CONFIDENCE", "0.45"))
+
 class APIConfig:
     # Lightweight monitoring API server config
     HOST = "0.0.0.0"

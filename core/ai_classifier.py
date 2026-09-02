@@ -355,12 +355,82 @@ class SmolVLMClassifier(GPTClassifier):
         return (choices[0].get("message") or {}).get("content") or ""
 
 
+class CNNClassifier:
+    """Local MobileNetV3 trash classifier (ONNX), fine-tuned on kiosk captures.
+
+    No HTTP, no torch: onnxruntime + numpy only, so it runs offline on the Pi
+    in ~100-300ms. The model was distilled from the GPT backend by auto-labeling
+    ``captured_images/`` (see scripts/train_cnn.py) to close the domain gap that
+    made off-the-shelf garbage classifiers useless on real kiosk frames.
+
+    Shares the ``classify(image) -> str`` contract with GPTClassifier: returns a
+    color in ``TrashClassification.VALID_COLORS`` or ``""`` (no object / low
+    confidence / error).
+    """
+
+    def __init__(self):
+        import json as _json
+        import numpy as np
+        import onnxruntime as ort
+
+        self._np = np
+        meta = _json.load(open(AIConfig.CNN_LABELS_PATH))
+        self.classes = meta["classes"]
+        self.mean = np.array(meta["mean"], dtype=np.float32).reshape(3, 1, 1)
+        self.std = np.array(meta["std"], dtype=np.float32).reshape(3, 1, 1)
+        self.min_conf = AIConfig.CNN_MIN_CONFIDENCE
+        self.session = ort.InferenceSession(
+            AIConfig.CNN_MODEL_PATH, providers=["CPUExecutionProvider"]
+        )
+        self.input_name = self.session.get_inputs()[0].name
+        logger.info(
+            "Loaded CNN backend %s (classes=%s)", AIConfig.CNN_MODEL_PATH, self.classes
+        )
+
+    def _preprocess(self, image: Any):
+        """cv2 BGR array -> normalized NCHW float32, matching eval transforms
+        (resize shorter edge to 256, center-crop 224, ImageNet normalize)."""
+        import cv2
+
+        np = self._np
+        h, w = image.shape[:2]
+        scale = 256 / min(h, w)
+        image = cv2.resize(image, (round(w * scale), round(h * scale)))
+        h, w = image.shape[:2]
+        top, left = (h - 224) // 2, (w - 224) // 2
+        image = image[top:top + 224, left:left + 224]
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+        image = image.transpose(2, 0, 1)  # HWC -> CHW
+        image = (image - self.mean) / self.std
+        return image[np.newaxis, :].astype(np.float32)
+
+    def classify(self, image: Any) -> str:
+        np = self._np
+        try:
+            x = self._preprocess(image)
+            logits = self.session.run(None, {self.input_name: x})[0][0]
+        except Exception:
+            logger.exception("CNN inference failed")
+            return ""
+        e = np.exp(logits - logits.max())
+        probs = e / e.sum()
+        i = int(probs.argmax())
+        cls, conf = self.classes[i], float(probs[i])
+        logger.info("CNN prediction: %s (%.2f)", cls, conf)
+        if conf < self.min_conf:
+            return ""
+        return cls if cls in TrashClassification.VALID_COLORS else ""
+
+
 def _build_classifier() -> GPTClassifier:
     """Pick the classifier backend named by ``AIConfig.BACKEND``."""
     backend = getattr(AIConfig, "BACKEND", "gpt").lower()
     if backend == "smolvlm":
         logger.info("Using local SmolVLM backend at %s", AIConfig.LLAMA_SERVER_URL)
         return SmolVLMClassifier()
+    if backend == "cnn":
+        logger.info("Using local CNN backend at %s", AIConfig.CNN_MODEL_PATH)
+        return CNNClassifier()
     if backend != "gpt":
         logger.warning("Unknown AI backend %r, falling back to gpt", backend)
     logger.info("Using OpenAI GPT backend (%s)", AIConfig.GPT_MODEL)

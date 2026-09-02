@@ -47,10 +47,15 @@ sudo apt-get update
 sudo apt-get install -y build-essential cmake git libcurl4-openssl-dev
 
 echo "==> Fetching llama.cpp into $LLAMA_DIR"
-if [ -d "$LLAMA_DIR/.git" ]; then
-  git -C "$LLAMA_DIR" pull --ff-only
-else
-  git clone --depth 1 https://github.com/ggml-org/llama.cpp "$LLAMA_DIR"
+# Fetch the source tarball rather than `git clone`. Some Pi network/git setups
+# force authentication on anonymous github.com clones (HTTP 401), but the
+# codeload tarball endpoint serves the same tree with no auth. No .git is kept;
+# re-running just re-downloads, which is fine for a pinned build tool.
+if [ ! -f "$LLAMA_DIR/CMakeLists.txt" ]; then
+  rm -rf "$LLAMA_DIR"
+  mkdir -p "$LLAMA_DIR"
+  curl -fsSL "https://codeload.github.com/ggml-org/llama.cpp/tar.gz/refs/heads/master" \
+    | tar xz -C "$LLAMA_DIR" --strip-components=1
 fi
 
 echo "==> Building (only the two targets we need, to save a lot of Pi time)"
